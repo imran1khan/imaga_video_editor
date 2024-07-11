@@ -1,4 +1,4 @@
-import ContentScreen from "@/components/ContentScreen"
+import ContentScreenMemo from "@/components/ContentScreen"
 import Header from "@/components/Header"
 
 
@@ -8,7 +8,7 @@ function page() {
         <div className="h-screen">
             <Header className="h-[8%]"/>
             <main className="h-[92%]">
-                <ContentScreen/>
+                <ContentScreenMemo/>
             </main>
         </div>
     )
