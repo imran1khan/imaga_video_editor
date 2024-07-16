@@ -245,9 +245,10 @@ function FineTune() {
                 console.log(`no fil found ${file}`);
                 return;
             }
+            resetFunction();
             setImageFile(file);
         }
-    }, [setImageFile]);
+    }, [setImageFile,resetFunction]);
     const check_uncheck= useCallback((e:React.MouseEvent<HTMLButtonElement, MouseEvent>)=>{
         e.preventDefault();
         if (!check.current) {

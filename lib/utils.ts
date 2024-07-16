@@ -36,3 +36,12 @@ export function debounce<T extends (...args: any[]) => void>(func: T, delay: num
   }
   return debouncedFunction
 }
+
+export function downloadImage(url:string,filename:string) {
+  const link = document.createElement(`a`);
+  link.download = filename;
+  link.href=url;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}

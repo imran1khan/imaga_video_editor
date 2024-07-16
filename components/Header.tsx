@@ -1,4 +1,4 @@
-
+"use client"
 import {
     Cloud,
     CreditCard,
@@ -47,14 +47,20 @@ import Image from "next/image"
 import { Button } from "@/components/ui/button"
 
 import { HamburgerMenuIcon } from "@radix-ui/react-icons"
-import React from "react"
+import React, { useCallback } from "react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
+import { useRecoilState, useSetRecoilState } from "recoil"
+import { downloadImageFile } from "@/packages/store/atoms/DownLoadImage"
 
 
 
 
 function Header({className}:{className?:string}) {
+    const [downloadImage,setDownLoadImageFile] = useRecoilState(downloadImageFile);
+    const downloadImageFunction=useCallback(async(e:React.MouseEvent<HTMLDivElement, MouseEvent>)=>{
+        setDownLoadImageFile(Math.random().toString());// this section is just for cleanup and restart
+    },[setDownLoadImageFile]);
     return (
         <div className={`flex bg-blue-900 justify-evenly items-center py-2 ${className}`}>
             <div><Image className="bg-slate-300 rounded-md p-2" width={80} height={80} src={`https://www.iloveimg.com/img/iloveimg.svg`} alt="" /></div>
@@ -114,6 +120,11 @@ function Header({className}:{className?:string}) {
                             <DropdownMenuItem>
                                 <Keyboard className="mr-2 h-4 w-4" />
                                 <span>Keyboard shortcuts</span>
+                                <DropdownMenuShortcut>⌘K</DropdownMenuShortcut>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={downloadImageFunction}>
+                                <Keyboard className="mr-2 h-4 w-4" />
+                                <span>download image</span>
                                 <DropdownMenuShortcut>⌘K</DropdownMenuShortcut>
                             </DropdownMenuItem>
                         </DropdownMenuGroup>
