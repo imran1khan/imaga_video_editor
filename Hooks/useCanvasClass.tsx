@@ -1,11 +1,13 @@
 import { downloadImage } from "@/lib/utils";
 import { downloadImageFile } from "@/packages/store/atoms/DownLoadImage";
-import { canvasScreenToggel, FineTuneAtom } from "@/packages/store/atoms/FinetuneAtom";
+import { canvasScreenToggel, FineTuneAtom, FineTuneAtomArray, FineTuneTypes, ImageFilterArray } from "@/packages/store/atoms/FinetuneAtom";
 import { ImageFileAtom } from "@/packages/store/atoms/ImageFileAtom";
+import { SaveFilterAtom } from "@/packages/store/atoms/SaveFilterAtom";
+
 import { CanvasDraw } from "@/utils/CanvasClass";
-import { url } from "inspector";
+
 import { useEffect, useRef } from "react";
-import { useRecoilState, useRecoilValue } from "recoil";
+import { useRecoilState, useRecoilValue, useSetRecoilState } from "recoil";
 
 export const useCanvasClass=(canvasId:string)=>{
     const Imagefile = useRecoilValue(ImageFileAtom);
@@ -13,6 +15,8 @@ export const useCanvasClass=(canvasId:string)=>{
     const canvasScreenTog = useRecoilValue(canvasScreenToggel);
     const canvasClassRef = useRef<CanvasDraw | null>(null);
     const [downloadimageFile,setDownLoadImageFile]= useRecoilState(downloadImageFile);
+    const [saveFilter,setSaveFilter]=useRecoilState(SaveFilterAtom);
+    const [imageFilterArray,setImageFilterArray]  = useRecoilState(FineTuneAtomArray);
     useEffect(()=>{
         const canvas = document.getElementById(canvasId) as HTMLCanvasElement;
         if (!canvas) {
@@ -33,8 +37,12 @@ export const useCanvasClass=(canvasId:string)=>{
             }
         }
         else{
-            canvasClassRef.current = new CanvasDraw(canvas);
-            canvasClassRef.current.drawImage();
+            const image = new Image();
+            image.src = '/demo.jpg';
+            image.onload=()=>{
+                canvasClassRef.current = new CanvasDraw(canvas,image);
+                canvasClassRef.current.drawImage();
+            }
         }
         return ()=>{
             if (Imagefile) {
@@ -56,13 +64,44 @@ export const useCanvasClass=(canvasId:string)=>{
             if (imageUrl) {
                 downloadImage(imageUrl,`image.png`);
             }
-            console.log('at the end')
-            console.log(imageUrl2)
+            if (imageUrl2) {
+                downloadImage(imageUrl2,`image2.png`);
+            }
         }
     },[downloadimageFile,setDownLoadImageFile]);
     useEffect(()=>{
         const svg = document.createElementNS(`http://www.w3.org/2000/svg`,`svg`);
-        console.log(svg.createSVGMatrix())
-    });
+        // console.log(svg.createSVGMatrix())
+    },[]);
+    useEffect(()=>{
+        if (saveFilter && canvasClassRef.current) {
+            const image = new Image();
+            image.src = `/demo.jpg`;
+            image.onload=()=>{
+                const imageUrl = canvasClassRef.current!.getDataUrl3(image);
+                const filterList = localStorage.getItem(`FilterArrayList`);
+                if (!imageUrl) {
+                    return;
+                }
+                if (filterList) {
+                    const filterArray = JSON.parse(filterList) as ImageFilterArray[];
+                    filterArray.push({imageUrl:imageUrl,...filter});
+                    localStorage.setItem(`FilterArrayList`,JSON.stringify(filterArray));
+                }
+                else{
+                    localStorage.setItem(`FilterArrayList`,JSON.stringify([{imageUrl,...filter}]));
+                    setImageFilterArray(p=>[...p,{imageUrl:imageUrl,...filter}]);
+                }
+            }
+            setSaveFilter(false);
+        }
+    },[saveFilter,setSaveFilter,filter,setImageFilterArray]);
+    useEffect(()=>{
+        const filterArray = localStorage.getItem(`FilterArrayList`);
+        if (filterArray) {
+            const filter = JSON.parse(filterArray) as ImageFilterArray[];
+            setImageFilterArray(filter);
+        }
+    },[setImageFilterArray])
     return canvasClassRef.current;
 }

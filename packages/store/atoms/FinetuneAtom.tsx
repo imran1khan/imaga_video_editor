@@ -46,4 +46,11 @@ export const HoldFineTuneAtom=atom<FineTuneTypes>({
         invert : 0,
         color: ``
     },
-})
+});
+export interface ImageFilterArray extends FineTuneTypes {
+    imageUrl:string,
+}
+export const FineTuneAtomArray=atom<ImageFilterArray[]>({
+    key:"FineTuneAtomArray",
+    default:[]
+});

@@ -10,6 +10,7 @@ import "./ContentScreen.css"
 import { FrameIcon, NotebookPen,Scaling, SlidersHorizontal, Sparkles} from "lucide-react"
 import { MemoFineTune } from "./sidebars/Finetune"
 import {MemoCanvas} from "./canvas/Canvas"
+import Filter from "./sidebars/Filter"
 
 
 function ContentScreen() {
@@ -35,7 +36,7 @@ function ContentScreen() {
         {
             uuid: "ffa8c705-212e-4e69-8d95-8a0874b60c5d",
             sidePanelname: "Filter",
-            content: <div>Filter</div>,
+            content: <Filter/>,
             sidepanelRef: hiddenPanelFilterRef,
         },
         {
