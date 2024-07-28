@@ -52,6 +52,7 @@ import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { useRecoilState, useSetRecoilState } from "recoil"
 import { downloadImageFile } from "@/packages/store/atoms/DownLoadImage"
+import ChangeFormet from "./ImageFormatChange/ChangeFormet"
 
 
 
@@ -59,7 +60,7 @@ import { downloadImageFile } from "@/packages/store/atoms/DownLoadImage"
 function Header({className}:{className?:string}) {
     const [downloadImage,setDownLoadImageFile] = useRecoilState(downloadImageFile);
     const downloadImageFunction=useCallback(async(e:React.MouseEvent<HTMLDivElement, MouseEvent>)=>{
-        setDownLoadImageFile(Math.random().toString());// this section is just for cleanup and restart
+        setDownLoadImageFile(true);
     },[setDownLoadImageFile]);
     return (
         <div className={`flex bg-blue-900 justify-evenly items-center py-2 ${className}`}>
@@ -81,7 +82,7 @@ function Header({className}:{className?:string}) {
                                             <div className="uppercase p-2 font-bold">{v.Category}</div>
                                             <div className="h-auto">
                                                 {
-                                                    v.Action.map((v, i) => (<div className="h-[50%] p-4 rounded-md cursor-pointer hover:bg-[#0f1a33]" key={v.contentName + i}>{v.contentName}</div>))
+                                                    v.Action.map((v, i) => (<div className="h-[50%] p-4 rounded-md cursor-pointer hover:bg-[#0f1a33]" key={v.contentName + i}>{v.contentName}{v.Element}</div>))
                                                 }
                                             </div>
                                         </div>
@@ -240,12 +241,15 @@ const data = {
             Category: "Optimize",
             Action: [
                 {
+                    Element:<></>,
                     contentName: "Compress IMAGE"
                 },
                 {
+                    Element:<></>,
                     contentName: "Upscale"
                 },
                 {
+                    Element:<></>,
                     contentName: "Remove background"
                 }
             ]
@@ -254,9 +258,11 @@ const data = {
             Category: "Create",
             Action: [
                 {
+                    Element:<></>,
                     contentName: "Meme generator"
                 },
                 {
+                    Element:<></>,
                     contentName: "Photo editor"
                 },
             ]
@@ -265,12 +271,15 @@ const data = {
             Category: "Modify",
             Action: [
                 {
+                    Element:<></>,
                     contentName: "Rotate IMAGE"
                 },
                 {
+                    Element:<></>,
                     contentName: "Crop IMAGE"
                 },
                 {
+                    Element:<></>,
                     contentName: "Resize IMAGE"
                 },
             ]
@@ -279,12 +288,15 @@ const data = {
             Category: "Convert",
             Action: [
                 {
+                    Element:<ChangeFormet title="Convert to JPG" convertionType="jpeg"/>,
                     contentName: "Convert to JPG"
                 },
                 {
+                    Element:<ChangeFormet title="Convert to PNG" convertionType="png"/>,
                     contentName: "Convert to PNG"
                 },
                 {
+                    Element:<></>,
                     contentName: "HTML to IMAGE"
                 },
             ]
@@ -293,9 +305,11 @@ const data = {
             Category: "Security",
             Action: [
                 {
+                    Element:<></>,
                     contentName: "Watermark IMAGE"
                 },
                 {
+                    Element:<></>,
                     contentName: "Blur face"
                 },
             ]

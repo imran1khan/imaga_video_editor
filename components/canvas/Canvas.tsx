@@ -8,7 +8,7 @@ function Canvas() {
     useCanvasClass(id);
     return (
         <>
-            <canvas id={id} className="max-w-full max-h-full w-full"></canvas>
+            <canvas id={id} className="w-full h-full"></canvas>
         </>
     )
 }

@@ -45,3 +45,32 @@ export function downloadImage(url:string,filename:string) {
   link.click();
   document.body.removeChild(link);
 }
+
+export function convertImageFormet(image: File, format: 'png' | 'jpeg'): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const imageEle = document.createElement('img');
+    imageEle.src = URL.createObjectURL(image);
+
+    imageEle.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      if (!ctx) {
+        reject(new Error('Failed to get canvas context'));
+        return;
+      }
+      
+      canvas.width = imageEle.width;
+      canvas.height = imageEle.height;
+      
+      ctx.drawImage(imageEle, 0, 0);
+
+      const url = canvas.toDataURL(`image/${format}`);
+      resolve(url);
+    };
+
+    imageEle.onerror = (err) => {
+      reject(new Error('Failed to load image'));
+    };
+  });
+}

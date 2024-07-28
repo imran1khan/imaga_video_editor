@@ -30,7 +30,7 @@ function Filter() {
             <hr />
             <div className='w-full h-full text-wrap bg-purple-500'>
                 {imageFilterArray.map((v)=>(
-                    <img className='w-full h-20' key={v.imageUrl} src={v.imageUrl} alt=''/>
+                    <img className='max-w-full h-auto' key={v.imageUrl} src={v.imageUrl} alt=''/>
                 ))}
             </div>
         </div>

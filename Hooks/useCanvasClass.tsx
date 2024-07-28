@@ -4,9 +4,11 @@ import { canvasScreenToggel, FineTuneAtom, FineTuneAtomArray, FineTuneTypes, Ima
 import { ImageFileAtom } from "@/packages/store/atoms/ImageFileAtom";
 import { SaveFilterAtom } from "@/packages/store/atoms/SaveFilterAtom";
 
+import { ShowMenuElement } from "@/packages/store/atoms/ShowMenu";
+
 import { CanvasDraw } from "@/utils/CanvasClass";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRecoilState, useRecoilValue, useSetRecoilState } from "recoil";
 
 export const useCanvasClass=(canvasId:string)=>{
@@ -17,6 +19,7 @@ export const useCanvasClass=(canvasId:string)=>{
     const [downloadimageFile,setDownLoadImageFile]= useRecoilState(downloadImageFile);
     const [saveFilter,setSaveFilter]=useRecoilState(SaveFilterAtom);
     const [imageFilterArray,setImageFilterArray]  = useRecoilState(FineTuneAtomArray);
+    const [canvasReady,setCanvasReady]=useState(false);
     useEffect(()=>{
         const canvas = document.getElementById(canvasId) as HTMLCanvasElement;
         if (!canvas) {
@@ -34,6 +37,7 @@ export const useCanvasClass=(canvasId:string)=>{
                 canvasClassRef.current = new CanvasDraw(canvas,image);
                 URL.revokeObjectURL(objUrl);
                 canvasClassRef.current.drawImage();
+                setCanvasReady(true);
             }
         }
         else{
@@ -42,6 +46,7 @@ export const useCanvasClass=(canvasId:string)=>{
             image.onload=()=>{
                 canvasClassRef.current = new CanvasDraw(canvas,image);
                 canvasClassRef.current.drawImage();
+                setCanvasReady(true);
             }
         }
         return ()=>{
@@ -52,23 +57,25 @@ export const useCanvasClass=(canvasId:string)=>{
     },[Imagefile,canvasId]);
     useEffect(()=>{
         if (canvasClassRef.current) {
-            console.log('running')
             canvasClassRef.current.applyFilter(filter);
             canvasClassRef.current.applyTintColor(filter);
         }
     },[filter,canvasScreenTog]);
     useEffect(()=>{
-        if (canvasClassRef.current) {
+        if (canvasClassRef.current && Imagefile && downloadimageFile) {
             const imageUrl = canvasClassRef.current.getdataUrl();
-            const imageUrl2 = canvasClassRef.current.getDataUrl2();
+            const filename = Imagefile.name.split(`.`)[0];
+            const type = Imagefile.name.split(`.`)[1];
+            const imageUrl2 = canvasClassRef.current.getDataUrl2(Imagefile.type);
             if (imageUrl) {
-                downloadImage(imageUrl,`image.png`);
+                downloadImage(imageUrl,`${filename}.${type}`);
             }
             if (imageUrl2) {
-                downloadImage(imageUrl2,`image2.png`);
+                downloadImage(imageUrl2,`${filename}.${type}`);
             }
+            setDownLoadImageFile(false);
         }
-    },[downloadimageFile,setDownLoadImageFile]);
+    },[downloadimageFile,setDownLoadImageFile,Imagefile]);
     useEffect(()=>{
         const svg = document.createElementNS(`http://www.w3.org/2000/svg`,`svg`);
         // console.log(svg.createSVGMatrix())
@@ -103,5 +110,26 @@ export const useCanvasClass=(canvasId:string)=>{
             setImageFilterArray(filter);
         }
     },[setImageFilterArray])
+
+    const setShowMenu = useSetRecoilState(ShowMenuElement);
+    useEffect(() => {
+        if (!canvasReady && !canvasClassRef.current) {
+            return;
+        }
+        const handleMouseEvent = (e:MouseEvent) => {
+            const mousePos = canvasClassRef.current?.getMousePostion(e);
+            if (mousePos && canvasClassRef.current?.IsMouseOverImage(mousePos.x, mousePos.y)) {
+                setShowMenu((p) => ({ ...p, imageMenu: false }));
+            }
+            else{
+                setShowMenu((p) => ({ ...p, imageMenu: true }));
+            }
+        };
+        canvasClassRef.current?.canvas.addEventListener('mousedown', handleMouseEvent);
+        
+        return () => {
+            canvasClassRef.current?.canvas.removeEventListener('mousedown', handleMouseEvent);
+        };
+    },[canvasReady,setShowMenu]);
     return canvasClassRef.current;
 }

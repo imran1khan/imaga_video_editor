@@ -4,13 +4,14 @@ import {
     ResizablePanel,
     ResizablePanelGroup,
 } from "@/components/ui/resizable"
-import React, { MutableRefObject, useCallback, useEffect, useMemo, useRef} from "react"
+import React, { MutableRefObject, useCallback, useEffect, useMemo, useRef } from "react"
 
-import { FrameIcon, NotebookPen,Scaling, SlidersHorizontal, Sparkles} from "lucide-react"
+import { FrameIcon, NotebookPen, Scaling, SlidersHorizontal, Sparkles, Sun } from "lucide-react"
 import { MemoFineTune } from "./sidebars/Finetune"
-import {MemoCanvas} from "./canvas/Canvas"
+import { MemoCanvas } from "./canvas/Canvas"
 import Filter from "./sidebars/Filter"
 import Adjust from "./sidebars/Adjust"
+import FineTuneImage from "./sidebars/FineTuneImage"
 
 
 function ContentScreen() {
@@ -24,7 +25,7 @@ function ContentScreen() {
         {
             uuid: "87b04ef2-799b-4cf5-8d4a-7d23939ba1fc",
             sidePanelname: "Adjust",
-            content: <Adjust/>,
+            content: <Adjust />,
             sidepanelRef: hiddenPanelAdjustRef,
         },
         {
@@ -36,7 +37,7 @@ function ContentScreen() {
         {
             uuid: "ffa8c705-212e-4e69-8d95-8a0874b60c5d",
             sidePanelname: "Filter",
-            content: <Filter/>,
+            content: <Filter />,
             sidepanelRef: hiddenPanelFilterRef,
         },
         {
@@ -123,28 +124,8 @@ function ContentScreen() {
     }
     return (
         <div className="h-full">
-            <ResizablePanelGroup
-                direction="horizontal"
-                className="min-h-[200px] border w-full"
-            >
-                <ResizablePanel defaultSize={75}>
-                    <div className="flex justify-center items-center h-full relative">
-                        <MemoCanvas/>
-                        {
-                            sidePanel.map((v) => (
-                                <div key={v.uuid} ref={v.sidepanelRef} id={v.sidePanelname} className="bg-slate-900 h-full absolute right-0 
-                                w-[12%] hidden">
-                                    {v.content}
-                                </div>
-                            ))
-                        }
-                    </div>
-                </ResizablePanel>
-                <ResizableHandle withHandle />
-                <ResizablePanel minSize={10} defaultSize={10} maxSize={10}>
-                    <InputFormSection1 inputListObj={inputListObj} />
-                </ResizablePanel>
-            </ResizablePanelGroup>
+            <MemoCanvas />
+            <FineTuneImage/>
         </div>
     )
 }
@@ -178,3 +159,29 @@ const InputFormSection1: React.FC<InputFormSectionProps> = ({ inputListObj }) =>
 };
 
 
+/*
+<div className="h-full">
+    <ResizablePanelGroup
+        direction="horizontal"
+        className="min-h-[200px] border w-full"
+    >
+        <ResizablePanel defaultSize={75}>
+            <div className="flex justify-center items-center h-full relative">
+                <MemoCanvas/>
+                {
+                    sidePanel.map((v) => (
+                        <div key={v.uuid} ref={v.sidepanelRef} id={v.sidePanelname} className="bg-slate-900 h-full absolute right-0 
+                        w-[12%] hidden">
+                            {v.content}
+                        </div>
+                    ))
+                }
+            </div>
+        </ResizablePanel>
+        <ResizableHandle withHandle />
+        <ResizablePanel minSize={10} defaultSize={10} maxSize={10}>
+            <InputFormSection1 inputListObj={inputListObj} />
+        </ResizablePanel>
+    </ResizablePanelGroup>
+</div>
+*/
