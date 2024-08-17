@@ -18,6 +18,23 @@ export function hexToRgb(hex:string) {
   return {r,g,b};
 }
 
+export function rgbaToHex(rgba:string){
+  const match = rgba.match(/^rgba?\((\d+),\s*(\d+)(?:,\s*(\d+(?:\.\d+)?))?\)$/);
+  if (!match) {
+    return;
+  }
+  const r = parseInt(match[1],10);
+  const g = parseInt(match[2],10);
+  const b = parseInt(match[3],10);
+  const a = match[4]?parseFloat(match[4]):1;
+
+  const hex = '#'+(a===1?'':componentToHex(Math.round(r*a))+componentToHex(Math.round(g*a))+componentToHex(Math.round(b*a)));
+  return hex;
+}
+function componentToHex(c:number){
+  const hex=c.toString(16);
+  return hex.length===1?'0'+hex:hex;
+}
 export function debounce<T extends (...args: any[]) => void>(func: T, delay: number) {
   let timeoutId: NodeJS.Timeout | null;
   const debouncedFunction = function (...args: any[]) {
@@ -73,4 +90,9 @@ export function convertImageFormet(image: File, format: 'png' | 'jpeg'): Promise
       reject(new Error('Failed to load image'));
     };
   });
+}
+
+export function RandomInt(min:number,max:number) {
+  const num = Math.floor(Math.random()*(max-min))+min;
+  return num;
 }

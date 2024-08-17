@@ -3,7 +3,7 @@ import { debounce } from '@/lib/utils';
 import { FineTuneAtom, FineTuneKey } from '@/packages/store/atoms/FinetuneAtom';
 import { ShowMenuElement } from '@/packages/store/atoms/ShowMenu';
 import { Blend, BoxSelect, Circle, CircleDashed, CircleSlash2, Droplets, Gem, Palette, Rainbow, Sun } from 'lucide-react'
-import React, { ChangeEvent, useCallback, useRef } from 'react'
+import React, { ChangeEvent, useCallback, useEffect, useRef } from 'react'
 import { useRecoilState, useRecoilValue } from 'recoil';
 import { Button } from '../ui/button';
 
@@ -107,7 +107,7 @@ function FineTuneImage() {
             inputName: "Color",
             inputIcon: <Palette strokeWidth={`1px`} size={20} />,
             type: "color",
-            defaultValue: `#fff`,
+            defaultValue: color.color,
             min: undefined,
             max: undefined
         },
@@ -220,18 +220,18 @@ function FineTuneImage() {
         });
     },[setColor]);
     return (
-        <div ref={MainDivRef} hidden={showMenu.imageMenu} className="absolute h-[50%] w-60 top-12 left-4 bg-slate-800 rounded-md space-y-1 px-1 pt-2">
+        <div ref={MainDivRef} hidden={showMenu.imageMenu} className="absolute h-[50%] w-60 top-12 left-4 bg-slate-400 text-white dark:bg-slate-800 rounded-md space-y-1 px-1 pt-2">
             {colorEffectArr.map((v) => {
                 return (
                     <div key={v.uuid} className="flex justify-between">
                         <span className=''>{v.inputIcon}</span>
                         <span className="font-extralight text-sm w-[50%] ml-1">{v.inputName}</span>
-                        <input onChange={onChangeHandeler} className={`w-[50%] ${v.inputName === 'Color' ? `bg-[#00000000]` : `bg-[#0b1e35a7]`} text-sm font-extralight`} min={v.min} max={v.max} defaultValue={v.defaultValue} type={v.type} name={v.inputID} id='' />
+                        <input onChange={onChangeHandeler} className={`w-[50%] ${v.inputName === 'Color' ? `bg-[#00000000]` : `bg-[#0b1e35a7]`} text-sm font-extralight`} min={v.min} max={v.max} value={v.defaultValue} type={v.type} name={v.inputID} id='' />
                     </div>
                 )
             })}
             <div>
-                <Button variant={`outline`} onClick={()=>resetInput()}>reset</Button>
+                <Button className='text-black dark:text-white' variant={`outline`} onClick={()=>resetInput()}>reset</Button>
             </div>
         </div>
     )

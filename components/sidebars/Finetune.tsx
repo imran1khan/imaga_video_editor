@@ -1,19 +1,23 @@
 import { Blend, BoxSelect, Circle, CircleDashed, CircleSlash2, Droplets, Gem, Maximize, Minimize, Palette, PenOff, PlusIcon, Rainbow, Sun } from 'lucide-react';
 import React, { ChangeEvent, memo, useCallback, useEffect, useRef, useState } from 'react'
 import { Button } from '../ui/button';
-import { useRecoilState, useSetRecoilState } from 'recoil';
+import { useRecoilState, useRecoilValue, useSetRecoilState } from 'recoil';
 import { canvasScreenToggel, FineTuneAtom, FineTuneKey, HoldFineTuneAtom } from '@/packages/store/atoms/FinetuneAtom';
 import { ImageFileAtom } from '@/packages/store/atoms/ImageFileAtom';
 import { debounce } from '@/lib/utils';
 
 function FineTune() {
     const [color, setColor] = useRecoilState(FineTuneAtom);
+    const color2 = useRecoilValue(FineTuneAtom);
     const [holdData,setHoldData]=useRecoilState(HoldFineTuneAtom);
     const [canvasScreen , toggelCanvasSceen] = useRecoilState(canvasScreenToggel);
     const check = useRef(false);
     const setImageFile = useSetRecoilState(ImageFileAtom);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const inputListdiv = useRef<HTMLDivElement | null>(null);
+    useEffect(()=>{
+        console.log(color2)
+    },[color2]);
     const colorEffectArr = [
         {
             uuid: "8563d075-eb32-4252-a8f9-49d72b3e0bb8",
