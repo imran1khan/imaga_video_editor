@@ -37,7 +37,7 @@ function Header2() {
                     <div className='hover:cursor-pointer'><Diamond size={15} strokeWidth={1.5} /></div>
                     <div onClick={()=>{onClick('arc')}} className={`hover:cursor-pointer h-full px-3 rounded-md flex items-center ${squareAtom==='arc'?`dark:bg-purple-500 bg-green-600`:``}`}><Circle size={15} strokeWidth={1.5} /></div>
                     <div className='hover:cursor-pointer'><MoveRight size={15} strokeWidth={1.5} /></div>
-                    <div className='hover:cursor-pointer'><Minus size={15} strokeWidth={1.5} /></div>
+                    <div onClick={()=>{onClick('line')}} className={`hover:cursor-pointer h-full px-3 rounded-md flex items-center ${squareAtom==='line'?`dark:bg-purple-500 bg-green-600`:``}`}><Minus size={15} strokeWidth={1.5} /></div>
                     <div className='hover:cursor-pointer'><Type size={15} strokeWidth={1.5} /></div>
                     <div className='hover:cursor-pointer'><Img size={15} strokeWidth={1.5} /></div>
                     <div className='hover:cursor-pointer'><Eraser size={15} strokeWidth={1.5} /></div>

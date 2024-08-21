@@ -1,7 +1,7 @@
 import { hexToRgb, RandomInt } from "@/lib/utils";
 import { FineTuneTypes } from "@/packages/store/atoms/FinetuneAtom";
 import { ImageEffect } from "./ImageEffect";
-import { arc, point, rectangle, RGBA, shape } from "./Interface";
+import { arc, arc2, point, point2, rectangle, RGBA, shape } from "./Interface";
 import { ShapeManager } from "./ShapeManger";
 
 
@@ -23,8 +23,8 @@ interface ImagePosition {
     w:null|number,
     h:null|number
 }
-type Mode = 'none' | 'drag' | 'drawTriangle'|'InteractiveRactangle'|'imageResize';
-export type drawingMode = `none`|`ractangle`|`arc`;
+type Mode = 'none' | 'drag' | 'drawTriangle'|'InteractiveRactangle'|'imageResize'|'rotate';
+export type drawingMode = `none`|`ractangle`|`arc`|'line';
 interface imageEffectObject {
     px: number
     py: number
@@ -60,7 +60,7 @@ export class CanvasDraw {
     private SelectedImage: ImagePosition = { px: null, py: null, index: null,w:null,h:null };
     private Origin = { x: 0, y: 0 };
     private InterativeRectangle={x:0,y:0};
-    private FrameCodinate:{cornerRact:point[],size:number}={cornerRact:[],size:0};//this is for showng
+    private FrameCodinate:{cornerRact:point[],size:number,circlePoint:{x:number,y:number,radius:number}}={cornerRact:[],size:0,circlePoint:{y:0,x:0,radius:0}};//this is for showng
     // for resize image
     private corner:null|number=null;
     public changeAspect:boolean=false;
@@ -71,7 +71,11 @@ export class CanvasDraw {
     public ShapeManger;
     public shapesArray:shape[]=[];
     public currentShape:shape|null=null;
-    public StaticCanvasColor:string=''
+    public StaticCanvasColor:string='';
+    public MoveShape:{index:number,dx:number,dy:number}|null=null;
+    // for roating he shape
+    public startAngle:{angle:number,center:point2}|null=null;
+    public selectedShape:{shape:shape,index:number}|null=null;
     constructor(canvas: HTMLCanvasElement,interactiveCanvas:HTMLCanvasElement, image?: HTMLImageElement) {
         this.StaticCanvas = canvas
         this.InteractiveCanvas=interactiveCanvas;
@@ -113,6 +117,13 @@ export class CanvasDraw {
     mouseClickInteractive(e:MouseEvent){
         const mousePos = this.getMousePostion2(e).InteractiveCanvas;
         const imagePos = this.IsMouseOverImage(mousePos.x,mousePos.y);
+        const shapeIndex = this.ShapeManger?.isMouseOverTheShape(mousePos.x,mousePos.y);
+        if (shapeIndex!==null && shapeIndex!==undefined) {
+            const shape = this.ShapeManger!.shapesArray[shapeIndex];
+            this.selectedShape={shape:shape,index:shapeIndex};
+            this.clearInteractive();
+            this.FrameAround_Shape(shape);
+        }
         if (imagePos.index!==null && imagePos.px!==null && imagePos.py!==null) {
             // const image = this.imageEffectObj[imagePos.index];
             const {AdjustedImageCordinate}=this.getAllCordinate(imagePos.index);
@@ -125,9 +136,28 @@ export class CanvasDraw {
         //mouse position of the drawing canvas and the intercative canvas is going to be same
         const imagePos = this.IsMouseOverImage(mousePos.x,mousePos.y);
         const check = this.checkForFrameCorner(e);
-        if (check!==null && this.SelectedImage.index!==null) {
+        const index = this.ShapeManger?.isMouseOverTheShape(mousePos.x,mousePos.y);
+        if (index!==null && index!==undefined && this.drawMode==='none') {
+            this.mode='drag';
+            const {startPoint} = this.ShapeManger!.shapesArray[index];
+            this.MoveShape={index:index,dx:e.clientX-startPoint.x!,dy:e.clientY-startPoint.y!};
+        }
+        else if (check!==null && check<4 && this.SelectedImage.index!==null) {
             this.mode='imageResize';
             this.corner=check
+        }
+        else if (check===4) {
+            this.mode='rotate';
+            if (this.selectedShape?.shape?.type==='rectangle2') {
+                const {startPoint,endPoint}=this.selectedShape.shape;
+                const w = endPoint.x-startPoint.x;
+                const h = endPoint.y-startPoint.y;
+                const cx = startPoint.x!+(w)/2;
+                const cy = startPoint.y!+(h)/2;
+                const angle = Math.atan2(e.clientY-cy,e.clientX-cx);
+                this.startAngle={angle:angle,center:{x:cx,y:cy}};
+            }
+
         }
         else if (imagePos.index!==null && imagePos.px!==null && imagePos.py!==null) {
             this.mode='drag';
@@ -147,14 +177,34 @@ export class CanvasDraw {
             this.startDrawing=true;
             this.startPoint = {x:e.clientX,y:e.clientY};
         }
+        if (this.drawMode==='line') {
+            this.startDrawing=true;
+            this.startPoint = {x:e.clientX,y:e.clientY};
+        }
     }
     mouseMoveInteractive(e:MouseEvent){
         if (this.mode==='InteractiveRactangle' && !this.startDrawing) {
             this.clearInteractive();
             this.drawRectangle(this.InterativeRectangle.x,this.InterativeRectangle.y,e.clientX-this.InterativeRectangle.x,e.clientY-this.InterativeRectangle.y);
         }
-        else if (this.mode === `drag`) {
-            this.dragMoveImage2(e);
+        if (this.mode==='rotate') {
+            const {center,angle}=this.startAngle!;
+            const currentAngle = Math.atan2(e.clientY-center.y,e.clientX-center.x);
+            const New_Angle = currentAngle-angle;
+            const {shape,index}=this.selectedShape!;
+            if (shape.type==='rectangle2') {
+                this.drawCanvas();
+                this.ShapeManger?.drawRectangleWithArc(shape.startPoint.x,shape.startPoint.y,shape.endPoint.x-shape.startPoint.x,shape.endPoint.y-shape.startPoint.y,{rotation:New_Angle});
+            }
+        }
+        if (this.mode === `drag`) {
+            if (this.MoveShape) {
+                this.drawCanvas()
+                this.dragMoveShape(e);
+            }
+            else {
+                this.dragMoveImage2(e);
+            }
             this.ShapeManger?.drawShapes();
         }
         else if (this.mode==='imageResize'){
@@ -174,12 +224,16 @@ export class CanvasDraw {
             const w = e.clientX-this.startPoint.x;
             const h = e.clientY-this.startPoint.y;
 
-            this.currentShape={type:'ractangle',startPoint:this.startPoint,width:w,height:h};
+            // this.currentShape={type:'ractangle',startPoint:this.startPoint,width:w,height:h};
+            
+            const p1={x:this.startPoint.x,y:this.startPoint.y}
+            const p2={x:e.clientX,y:e.clientY}
+            this.currentShape={type:'rectangle2',startPoint:p1,endPoint:p2}
             this.drawCanvas();
             this.ShapeManger?.drawShapes();
             this.ShapeManger?.drawRectangleWithArc(this.startPoint.x,this.startPoint.y,w,h)
         }
-        if (this.drawMode==='arc' && this.startPoint) {
+        if (this.drawMode==='arc' && this.startDrawing) {
             if (!this.startPoint.x || !this.startPoint.y) {
                 return;
             }
@@ -189,6 +243,17 @@ export class CanvasDraw {
             this.ShapeManger?.drawShapes();
             this.ShapeManger?.drawLine({x:this.startPoint.x,y:this.startPoint.y},{x:e.clientX,y:e.clientY},{setLineDesh:[5,3]});
             this.ShapeManger?.drawArc(this.currentShape);
+        }
+        if (this.drawMode==='line' && this.startDrawing) {
+            if (!this.startPoint.x || !this.startPoint.y) {
+                return;
+            }
+            const startPoint={x:this.startPoint.x,y:this.startPoint.y};
+            const endpoint = {x:e.clientX,y:e.clientY};
+            this.currentShape={type:'line',startPoint:startPoint,endPoint:endpoint};
+            this.drawCanvas();
+            this.ShapeManger?.drawShapes();
+            this.ShapeManger?.drawLine(startPoint,endpoint);
         }
         const check = this.checkForFrameCorner(e);
         if (check===null) {
@@ -203,14 +268,25 @@ export class CanvasDraw {
         }
         if (this.mode===`drag`) {
             this.mode='none'
+            this.MoveShape=null
         }
         if (this.mode===`imageResize`) {
             this.corner=null;
             this.mode='none'
         }
         if (this.startDrawing && this.currentShape) {
+            if (this.currentShape.type === 'rectangle2' || this.currentShape.type === 'line') {
+                const {startPoint,endPoint}=this.currentShape;
+                const {minPoint,maxPoint}=this.ShapeManger!.findMaxMinPoints(startPoint,endPoint);
+                this.currentShape.startPoint=minPoint;
+                this.currentShape.endPoint=maxPoint;
+            }
             this.ShapeManger?.shapesArray.push(this.currentShape);
             this.startPoint={x:null,y:null};
+            this.currentShape=null;
+        }
+        if (this.mode==='rotate') {
+            this.mode='none';
         }
         this.startDrawing = false;
     }
@@ -354,6 +430,49 @@ export class CanvasDraw {
         this.drawCanvas();
         this.drawFrame(AdjustedImageCordinate.topLeft.x,AdjustedImageCordinate.topLeft.y,AdjustedImageCordinate.bottomRight.x-AdjustedImageCordinate.topLeft.x,AdjustedImageCordinate.bottomRight.y-AdjustedImageCordinate.topLeft.y);
     }
+    dragMoveShape(e:MouseEvent){
+        if (!this.MoveShape) {
+            return;   
+        }
+        const {index,dx,dy}=this.MoveShape;
+        const shape = this.ShapeManger?.shapesArray[index];
+        let newX:number;
+        let newY:number;
+        if (shape?.type==='arc') {
+            newX = e.clientX-dx;
+            newY = e.clientY-dy;
+            this.ShapeManger?.setStartPosition(index,newX,newY);
+        }
+        else if (shape?.type==='rectangle2') {
+            newX = e.clientX-dx;
+            newY = e.clientY-dy;
+            const {endPoint,startPoint}=shape;
+            const w = endPoint.x-startPoint.x;
+            const h = endPoint.y-startPoint.y;
+            const newEndPoint={x:newX+w,y:newY+h};
+            this.ShapeManger!.shapesArray[index]={...shape,startPoint:{x:newX,y:newY},endPoint:newEndPoint}
+        }
+        else if (shape?.type==='line') {
+            newX = e.clientX-dx;
+            newY = e.clientY-dy;
+            const {endPoint,startPoint}=shape;
+            const deltaX = newX-startPoint.x;
+            const deltaY = newY-startPoint.y;
+            endPoint.x+=deltaX;
+            endPoint.y+=deltaY;
+            this.ShapeManger!.shapesArray[index]={...shape,startPoint:{x:newX,y:newY},endPoint};
+        }
+    }
+    drawCircle(x:number,y:number,radius:number){
+        if (!this.InteractiveCtx) {
+            return;
+        }
+        this.InteractiveCtx.save();
+        this.InteractiveCtx.beginPath();
+        this.InteractiveCtx.arc(x,y,radius,0,2*Math.PI);
+        this.InteractiveCtx.stroke();
+        this.InteractiveCtx.restore();
+    }
     drawRectangle(x: number, y: number, w: number, h: number, color:{fillStyle:string,strokeStyle:string}={fillStyle:"rgba(255, 147, 203, 0.04)",strokeStyle:'rgba(248, 110, 181, 1)'}) {
         const ctx = this.InteractiveCanvas.getContext('2d');
         if (!ctx) {
@@ -443,29 +562,40 @@ export class CanvasDraw {
             bottomRight: { x: image.px, y: image.py + image.height }
         };
 
-        let maxCordinate = { ...imageCordinate.topLeft }; 
-        let minCordinate = { ...imageCordinate.topLeft };
-    
-        for (const key in imageCordinate) {
-            if (Object.prototype.hasOwnProperty.call(imageCordinate, key)) {
-                const Cordinate = imageCordinate[key as keyof typeof imageCordinate];
-    
-                if (Cordinate.x > maxCordinate.x) maxCordinate.x = Cordinate.x;
-                if (Cordinate.y > maxCordinate.y) maxCordinate.y = Cordinate.y;
-    
-                if (Cordinate.x < minCordinate.x) minCordinate.x = Cordinate.x;
-                if (Cordinate.y < minCordinate.y) minCordinate.y = Cordinate.y;
-            }
-        }
+        const PointArr = [{ x: image.px, y: image.py },{ x: image.px + image.width, y: image.py },{ x: image.px + image.width, y: image.py + image.height },{ x: image.px, y: image.py + image.height }]
+        const {minPoints,maxPoints}=this.getMaxMin_points(PointArr);
     
         const AdjustedImageCordinate = {
-            topLeft: minCordinate,
-            topRight: { x: maxCordinate.x, y: minCordinate.y },
-            bottomLeft: { x: minCordinate.x, y: maxCordinate.y },
-            bottomRight: maxCordinate
+            topLeft: minPoints,
+            topRight: { x: maxPoints.x, y: minPoints.y },
+            bottomLeft: { x: minPoints.x, y: maxPoints.y },
+            bottomRight: maxPoints
         };
     
         return { imageCordinate, AdjustedImageCordinate };
+    };
+    getMaxMin_points(pointsArr:point2[]){
+        const all_X=pointsArr.map(v=>v.x);
+        const all_Y=pointsArr.map(v=>v.y);
+        const maxX=Math.max(...all_X);
+        const maxY=Math.max(...all_Y);
+        const minX=Math.min(...all_X);
+        const minY=Math.min(...all_Y);
+        return {minPoints:{x:minX,y:minY},maxPoints:{x:maxX,y:maxY}}; 
+    }
+    FrameAround_Shape(shape:shape){
+        if (shape.type==='arc') {
+            const {startPoint,radius}=shape;
+            const x1 = startPoint.x!-radius!;
+            const y1 = startPoint.y!-radius!;
+            const w=2*radius!;
+            const h=2*radius!;
+            this.drawFrame(x1,y1,w,h,{space:5,squareSize:10});
+        }
+        else if (shape.type === 'rectangle2') {
+            const {startPoint,endPoint}=shape
+            this.drawFrame(startPoint.x,startPoint.y,endPoint.x-startPoint.x,endPoint.y-startPoint.y);
+        }
     }    
     drawFrame(x: number, y: number, w: number, h: number, obj: { squareSize: number, space: number } = { squareSize: 10, space: 10 }) {
         // Calculate the new frame position with the given space
@@ -484,12 +614,16 @@ export class CanvasDraw {
         corners.forEach(corner => {
             this.drawRectangle(corner.x, corner.y, obj.squareSize, obj.squareSize);
         });
-    
+        // draw a circle on the top
+        const mx = newX+(lastX-newX)/2;
+        const my = newY-20;
+        this.drawCircle(mx,my,5);
         // Draw the outer rectangle
         this.drawRectangle(newX, newY, lastX - newX, lastY - newY, { fillStyle: 'rgba(0, 0, 0, 0)', strokeStyle: 'rgba(248, 110, 181, 1)' });
         this.FrameCodinate.cornerRact = corners,
-        this.FrameCodinate.size=obj.squareSize
-    }    
+        this.FrameCodinate.size=obj.squareSize;
+        this.FrameCodinate.circlePoint={x:mx,y:my,radius:5};
+    }
     showSelection(e: MouseEvent) {// basically this function show all the element which can be selected via mouse if mouse is above an element the mouse style is going to get change
         const mousePos = this.getMousePostion(e);
         const adjustedMouseX = (mousePos.x - this.Origin.x) / this.scale;
@@ -541,6 +675,12 @@ export class CanvasDraw {
                     break;
                 }
             }
+        }
+        const {x,y,radius}=this.FrameCodinate.circlePoint;// circle
+        const dist = Math.hypot(e.clientX-x,e.clientY-y);
+        if (dist<=radius) {
+            chack=4;
+            return chack;
         }
         //[0:top-left,1:top-right,2:bottom-right,3:bottom-left]
         if (chack===1 || chack===3) {

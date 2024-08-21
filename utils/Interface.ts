@@ -17,11 +17,21 @@ export interface point2 {
     y:number
 }
 
+export interface line extends shapeUnit {
+    type:'line',
+    startPoint:point2,
+    endPoint:point2,
+}
 export interface rectangle extends shapeUnit {
     type:'ractangle'
     startPoint:point,
-    width:number|null,
-    height:number|null
+    width:number,
+    height:number
+}
+export interface rectangle2 extends shapeUnit{
+    type:'rectangle2',
+    startPoint:point2,
+    endPoint:point2,
 }
 export interface arc extends shapeUnit {
     type:`arc`
@@ -40,4 +50,4 @@ export interface arc2 extends shapeUnit {
     counterClockWise:boolean,
 }
 
-export type shape = rectangle | arc |arc2;
+export type shape =  arc | arc2 | rectangle2 |line;
