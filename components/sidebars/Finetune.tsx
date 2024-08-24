@@ -3,7 +3,7 @@ import React, { ChangeEvent, memo, useCallback, useEffect, useRef, useState } fr
 import { Button } from '../ui/button';
 import { useRecoilState, useRecoilValue, useSetRecoilState } from 'recoil';
 import { canvasScreenToggel, FineTuneAtom, FineTuneKey, HoldFineTuneAtom } from '@/packages/store/atoms/FinetuneAtom';
-// import { ImageFileAtom } from '@/packages/store/atoms/ImageFileAtom';
+
 import { debounce } from '@/lib/utils';
 
 function FineTune() {
@@ -12,7 +12,7 @@ function FineTune() {
     const [holdData,setHoldData]=useRecoilState(HoldFineTuneAtom);
     const [canvasScreen , toggelCanvasSceen] = useRecoilState(canvasScreenToggel);
     const check = useRef(false);
-    // const setImageFile = useSetRecoilState(ImageFileAtom);
+
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const inputListdiv = useRef<HTMLDivElement | null>(null);
     useEffect(()=>{
@@ -250,7 +250,6 @@ function FineTune() {
                 return;
             }
             resetFunction();
-            // setImageFile(file);
         }
     }, [resetFunction]);
     const check_uncheck= useCallback((e:React.MouseEvent<HTMLButtonElement, MouseEvent>)=>{
