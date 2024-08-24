@@ -1,7 +1,7 @@
 import { downloadImage, rgbaToHex } from "@/lib/utils";
 import { downloadImageFile } from "@/packages/store/atoms/DownLoadImage";
 import { canvasScreenToggel, FineTuneAtom, FineTuneAtomArray, FineTuneTypes, ImageFilterArray } from "@/packages/store/atoms/FinetuneAtom";
-import { ImageFileAtom, ImageFileListAtom } from "@/packages/store/atoms/ImageFileAtom";
+import { ImageFileListAtom } from "@/packages/store/atoms/ImageFileAtom";
 import { SaveFilterAtom } from "@/packages/store/atoms/SaveFilterAtom";
 import { changeAspectratio, deleteImageAtom, ScreenPopoUpAtom } from "@/packages/store/atoms/ScreenPopUpAtom";
 
@@ -15,7 +15,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRecoilState, useRecoilValue, useSetRecoilState } from "recoil";
 
 export const useCanvasClass=(canvasId:string,interactiveCanvasId:string)=>{
-    const Imagefile = useRecoilValue(ImageFileAtom);
+
     const ImageElementList=useRecoilValue(ImageFileListAtom);
     const [filter,setFilter]=useRecoilState(FineTuneAtom);
     const canvasScreenTog = useRecoilValue(canvasScreenToggel);
@@ -41,12 +41,7 @@ export const useCanvasClass=(canvasId:string,interactiveCanvasId:string)=>{
             canvasClassRef.current.drawCanvas();
             setCanvasReady(true);
         }
-        return ()=>{
-            if (Imagefile) {
-                URL.revokeObjectURL(URL.createObjectURL(Imagefile));
-            }
-        }
-    },[Imagefile,canvasId,interactiveCanvasId]);
+    },[canvasId,interactiveCanvasId]);
     //set color canvas_color
     const [color,setColor] = useRecoilState(selectedColorAtom);
     const [pickerValue,setPickerValue]=useRecoilState(ColorPickerPopUpAtom);
@@ -134,20 +129,16 @@ export const useCanvasClass=(canvasId:string,interactiveCanvasId:string)=>{
     },[filter,canvasScreenTog]);
 
     useEffect(()=>{
-        if (canvasClassRef.current && Imagefile && downloadimageFile) {
-            const imageUrl = canvasClassRef.current.getdataUrl();
-            const filename = Imagefile.name.split(`.`)[0];
-            const type = Imagefile.name.split(`.`)[1];
-            const imageUrl2 = canvasClassRef.current.getDataUrl2(Imagefile.type);
+        if (canvasClassRef.current && downloadimageFile) {
+            const imageUrl = canvasClassRef.current.getDataUrl();
+            const filename = 'download';
+            const type = 'png';
             if (imageUrl) {
                 downloadImage(imageUrl,`${filename}.${type}`);
             }
-            if (imageUrl2) {
-                downloadImage(imageUrl2,`${filename}.${type}`);
-            }
             setDownLoadImageFile(false);
         }
-    },[downloadimageFile,setDownLoadImageFile,Imagefile]);
+    },[downloadimageFile,setDownLoadImageFile]);
 
     useEffect(()=>{
         if (saveFilter && canvasClassRef.current) {

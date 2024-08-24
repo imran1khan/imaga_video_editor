@@ -23,8 +23,8 @@ function Header2() {
     return (
         <header onMouseEnter={()=>{mouseEnter()}} className="w-full flex justify-between absolute px-4 mt-2">
             <div className="z-[1]">
-                <HamMenu/>
-                {/* <HamMenu2/> */}
+                {/* <HamMenu/> */}
+                <HamMenu2/>
             </div>
             <div className="dark:bg-gray-900 bg-slate-400 text-white rounded-md z-[1] flex items-center">
                 <div className='flex items-center space-x-4 px-4 h-full'>

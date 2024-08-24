@@ -23,7 +23,7 @@ interface ImagePosition {
     w:null|number,
     h:null|number
 }
-type Mode = 'none' | 'drag' | 'drawTriangle'|'InteractiveRactangle'|'imageResize'|'rotate';
+type Mode = 'none'|'drag'|'drawTriangle'|'InteractiveRactangle'|'imageResize'|'rotate'|'resize';
 export type drawingMode = `none`|`ractangle`|`arc`|'line';
 interface imageEffectObject {
     px: number
@@ -34,17 +34,17 @@ interface imageEffectObject {
 }
 
 export class CanvasDraw {
-    private imageData: ImageValue = {
-        image: null,
-        sx: 0,
-        sy: 0,
-        sWidth: 0,
-        sHeight: 0,
-        dx: 0,
-        dy: 0,
-        dWidth: 0,
-        dHeight: 0,
-    };
+    // private imageData: ImageValue = {
+    //     image: null,
+    //     sx: 0,
+    //     sy: 0,
+    //     sWidth: 0,
+    //     sHeight: 0,
+    //     dx: 0,
+    //     dy: 0,
+    //     dWidth: 0,
+    //     dHeight: 0,
+    // };
     public StaticCanvas: HTMLCanvasElement;
     public InteractiveCanvas:HTMLCanvasElement;
     public InteractiveCtx:CanvasRenderingContext2D|null;
@@ -73,9 +73,12 @@ export class CanvasDraw {
     public currentShape:shape|null=null;
     public StaticCanvasColor:string='';
     public MoveShape:{index:number,dx:number,dy:number}|null=null;
+    public resizeShape:{index:number,dx:number,dy:number,closePoint:point2}|null=null;
     // for roating he shape
     public startAngle:{angle:number,center:point2}|null=null;
     public selectedShape:{shape:shape,index:number}|null=null;
+    //show frame
+    public showFrame:boolean=true;
     constructor(canvas: HTMLCanvasElement,interactiveCanvas:HTMLCanvasElement, image?: HTMLImageElement) {
         this.StaticCanvas = canvas
         this.InteractiveCanvas=interactiveCanvas;
@@ -122,13 +125,17 @@ export class CanvasDraw {
             const shape = this.ShapeManger!.shapesArray[shapeIndex];
             this.selectedShape={shape:shape,index:shapeIndex};
             this.clearInteractive();
-            this.FrameAround_Shape(shape);
+            if (this.showFrame) {
+                this.FrameAround_Shape(shape);
+            }
         }
         if (imagePos.index!==null && imagePos.px!==null && imagePos.py!==null) {
             // const image = this.imageEffectObj[imagePos.index];
             const {AdjustedImageCordinate}=this.getAllCordinate(imagePos.index);
             this.clearInteractive();
-            this.drawFrame(AdjustedImageCordinate.topLeft.x,AdjustedImageCordinate.topLeft.y,AdjustedImageCordinate.bottomRight.x-AdjustedImageCordinate.topLeft.x,AdjustedImageCordinate.bottomRight.y-AdjustedImageCordinate.topLeft.y);
+            if (this.showFrame) {
+                this.drawFrame(AdjustedImageCordinate.topLeft.x,AdjustedImageCordinate.topLeft.y,AdjustedImageCordinate.bottomRight.x-AdjustedImageCordinate.topLeft.x,AdjustedImageCordinate.bottomRight.y-AdjustedImageCordinate.topLeft.y);
+            }
         }
     }
     mouseDownInteractive(e:MouseEvent){
@@ -138,9 +145,22 @@ export class CanvasDraw {
         const check = this.checkForFrameCorner(e);
         const index = this.ShapeManger?.isMouseOverTheShape(mousePos.x,mousePos.y);
         if (index!==null && index!==undefined && this.drawMode==='none') {
+            const shape = this.ShapeManger!.shapesArray[index];
             this.mode='drag';
             const {startPoint} = this.ShapeManger!.shapesArray[index];
             this.MoveShape={index:index,dx:e.clientX-startPoint.x!,dy:e.clientY-startPoint.y!};
+            if (shape.type==='line') {
+                const {startPoint,endPoint}=shape;
+                const mousePointer={x:e.clientX,y:e.clientY};
+                const ds1=this.ShapeManger!.calculateDistance(startPoint,mousePointer);
+                const ds2=this.ShapeManger!.calculateDistance(endPoint,mousePointer);
+                const MinDist = ds1<ds2?ds1:ds2;
+                const closePoint = MinDist===ds1?startPoint:endPoint;
+                if (MinDist<=5) {
+                    this.mode='resize';
+                    this.resizeShape={index:index,dx:e.clientX-closePoint.x!,dy:e.clientY-closePoint.y!,closePoint:closePoint};
+                }
+            }
         }
         else if (check!==null && check<4 && this.SelectedImage.index!==null) {
             this.mode='imageResize';
@@ -194,6 +214,7 @@ export class CanvasDraw {
             const {shape,index}=this.selectedShape!;
             if (shape.type==='rectangle2') {
                 this.drawCanvas();
+                this.currentShape={...shape,angle:New_Angle}
                 this.ShapeManger?.drawRectangleWithArc(shape.startPoint.x,shape.startPoint.y,shape.endPoint.x-shape.startPoint.x,shape.endPoint.y-shape.startPoint.y,{rotation:New_Angle});
             }
         }
@@ -206,6 +227,26 @@ export class CanvasDraw {
                 this.dragMoveImage2(e);
             }
             this.ShapeManger?.drawShapes();
+        }
+        else if (this.mode==='resize' && this.resizeShape) {
+            const shape = this.ShapeManger!.shapesArray[this.resizeShape.index];
+            if (shape.type === 'line') {
+                const {closePoint,dx,dy}=this.resizeShape;
+                const {endPoint,startPoint}=shape;
+                if (startPoint.x===closePoint.x && startPoint.y===closePoint.y) {
+                    const X = e.clientX-dx;
+                    const Y = e.clientY-dy;
+                    this.currentShape = {type:'line',startPoint:{x:X,y:Y},endPoint}
+                }
+                else{
+                    const X = e.clientX-dx;
+                    const Y = e.clientY-dy;
+                    this.currentShape = {type:'line',startPoint,endPoint:{x:X,y:Y}};
+                }
+                this.drawCanvas();
+                this.ShapeManger?.drawShapes();
+                this.ShapeManger?.drawLine(this.currentShape.startPoint,this.currentShape.endPoint);
+            }
         }
         else if (this.mode==='imageResize'){
             if (this.corner!==null) {
@@ -223,15 +264,13 @@ export class CanvasDraw {
             }
             const w = e.clientX-this.startPoint.x;
             const h = e.clientY-this.startPoint.y;
-
-            // this.currentShape={type:'ractangle',startPoint:this.startPoint,width:w,height:h};
             
             const p1={x:this.startPoint.x,y:this.startPoint.y}
             const p2={x:e.clientX,y:e.clientY}
-            this.currentShape={type:'rectangle2',startPoint:p1,endPoint:p2}
+            this.currentShape={type:'rectangle2',startPoint:p1,endPoint:p2,angle:0}
             this.drawCanvas();
             this.ShapeManger?.drawShapes();
-            this.ShapeManger?.drawRectangleWithArc(this.startPoint.x,this.startPoint.y,w,h)
+            this.ShapeManger?.drawRectangleWithArc(this.startPoint.x,this.startPoint.y,w,h,{rotation:this.currentShape.angle});
         }
         if (this.drawMode==='arc' && this.startDrawing) {
             if (!this.startPoint.x || !this.startPoint.y) {
@@ -270,6 +309,13 @@ export class CanvasDraw {
             this.mode='none'
             this.MoveShape=null
         }
+        if (this.mode==='resize' && this.currentShape && this.resizeShape) {
+            this.ShapeManger?.shapesArray.splice(this.resizeShape.index,1);
+            this.ShapeManger?.shapesArray.push(this.currentShape);
+            this.mode='none';
+            this.resizeShape=null;
+            this.currentShape=null;
+        }
         if (this.mode===`imageResize`) {
             this.corner=null;
             this.mode='none'
@@ -285,7 +331,11 @@ export class CanvasDraw {
             this.startPoint={x:null,y:null};
             this.currentShape=null;
         }
-        if (this.mode==='rotate') {
+        if (this.mode==='rotate' && this.selectedShape) {
+            const {index,shape}=this.selectedShape;
+            if (this.currentShape?.type==='rectangle2' && shape.type==='rectangle2') {
+                this.ShapeManger!.shapesArray[index]={...shape,angle:this.currentShape.angle}
+            }
             this.mode='none';
         }
         this.startDrawing = false;
@@ -299,19 +349,19 @@ export class CanvasDraw {
             this.zoom2(mousePos.x, mousePos.y, zoom);
         }
     }
-    zoom(mouseX: number, mouseY: number, zoom: number) {
-        if (this.scale > 20000 && zoom === 1.1) {
-            return;
-        }
-        else if (this.scale < 0.04 && zoom === 0.9) {
-            return;
-        }
-        const previousScale = this.scale;
-        this.scale *= zoom;
-        this.imageData.dx = mouseX - ((mouseX - this.imageData.dx) * this.scale / previousScale);
-        this.imageData.dy = mouseY - ((mouseY - this.imageData.dy) * this.scale / previousScale);
-        // this.drawImage();
-    }
+    // zoom(mouseX: number, mouseY: number, zoom: number) {
+    //     if (this.scale > 20000 && zoom === 1.1) {
+    //         return;
+    //     }
+    //     else if (this.scale < 0.04 && zoom === 0.9) {
+    //         return;
+    //     }
+    //     const previousScale = this.scale;
+    //     this.scale *= zoom;
+    //     this.imageData.dx = mouseX - ((mouseX - this.imageData.dx) * this.scale / previousScale);
+    //     this.imageData.dy = mouseY - ((mouseY - this.imageData.dy) * this.scale / previousScale);
+    //     // this.drawImage();
+    // }
     zoom2(mouseX: number, mouseY: number, zoom: number) {
         const previousScale = this.scale;
         this.scale *= zoom;
@@ -715,21 +765,21 @@ export class CanvasDraw {
         }
         return -1;
     }
-    setBorder() {
-        if (!this.ctx || !this.imageData.image) {
-            return;
-        }
-        this.ctx.save();
-        this.ctx.translate(this.imageData.dx, this.imageData.dy);
-        this.ctx.scale(this.scale, this.scale);
-        if (this.ctx.strokeStyle !== 'transparent') {
-            this.ctx.lineWidth = 2 / this.ctx.getTransform().a;
-            this.ctx.strokeStyle = '#976cf5';
-            this.ctx.strokeRect(0, 0, this.imageData.image.width, this.imageData.image.height);
-            // this.ctx.strokeRect(this.imageData.dx, this.imageData.dy, this.imageData.dWidth, this.imageData.dHeight);
-        }
-        this.ctx.restore();
-    }
+    // setBorder() {
+    //     if (!this.ctx || !this.imageData.image) {
+    //         return;
+    //     }
+    //     this.ctx.save();
+    //     this.ctx.translate(this.imageData.dx, this.imageData.dy);
+    //     this.ctx.scale(this.scale, this.scale);
+    //     if (this.ctx.strokeStyle !== 'transparent') {
+    //         this.ctx.lineWidth = 2 / this.ctx.getTransform().a;
+    //         this.ctx.strokeStyle = '#976cf5';
+    //         this.ctx.strokeRect(0, 0, this.imageData.image.width, this.imageData.image.height);
+    //         // this.ctx.strokeRect(this.imageData.dx, this.imageData.dy, this.imageData.dWidth, this.imageData.dHeight);
+    //     }
+    //     this.ctx.restore();
+    // }
     getMousePostion(e: MouseEvent | WheelEvent) {
         const rect = this.StaticCanvas.getBoundingClientRect();
         return {
@@ -760,31 +810,34 @@ export class CanvasDraw {
         this.clear();
         this.drawCanvas();
     }
-    getdataUrl() {
-        if (!this.imageData.image) {
-            return;
-        }
-        const DataUrl = this.getSectionDataURL(this.imageData.dx, this.imageData.dy, this.imageData.dWidth * this.scale, this.imageData.dHeight * this.scale);
-        return DataUrl;
+    // getdataUrl() {
+    //     if (!this.imageData.image) {
+    //         return;
+    //     }
+    //     const DataUrl = this.getSectionDataURL(this.imageData.dx, this.imageData.dy, this.imageData.dWidth * this.scale, this.imageData.dHeight * this.scale);
+    //     return DataUrl;
+    // }
+    // getDataUrl2(type: string) {
+    //     let tempCanvas = document.createElement(`canvas`);
+    //     if (!this.imageData.image) {
+    //         return;
+    //     }
+    //     tempCanvas.width = this.imageData.image.width;
+    //     tempCanvas.height = this.imageData.image.height;
+    //     const tempCtx = tempCanvas.getContext(`2d`);
+    //     if (!tempCtx || !this.ctx) {
+    //         return;
+    //     }
+    //     tempCtx.filter = this.ctx.filter;
+    //     tempCtx.drawImage(this.imageData.image, 0, 0);
+    //     if (this.filter) {
+    //         this.applyTintColorOnCanvas(tempCanvas, this.filter);
+    //     }
+    //     return tempCanvas.toDataURL(`image/${type}`);
+    // };
+    getDataUrl(){
+        return this.StaticCanvas.toDataURL();
     }
-    getDataUrl2(type: string) {
-        let tempCanvas = document.createElement(`canvas`);
-        if (!this.imageData.image) {
-            return;
-        }
-        tempCanvas.width = this.imageData.image.width;
-        tempCanvas.height = this.imageData.image.height;
-        const tempCtx = tempCanvas.getContext(`2d`);
-        if (!tempCtx || !this.ctx) {
-            return;
-        }
-        tempCtx.filter = this.ctx.filter;
-        tempCtx.drawImage(this.imageData.image, 0, 0);
-        if (this.filter) {
-            this.applyTintColorOnCanvas(tempCanvas, this.filter);
-        }
-        return tempCanvas.toDataURL(`image/${type}`);
-    };
     getDataUrl3(image: HTMLImageElement) {
         let tempCanvas = document.createElement(`canvas`);
         tempCanvas.width = image.width;
@@ -801,9 +854,6 @@ export class CanvasDraw {
         return tempCanvas.toDataURL();
     }
     getSectionDataURL(sx: number, sy: number, sw: number, sh: number) {
-        if (!this.imageData.image || !this.ctx) {
-            return;
-        }
         const tempCanvas = document.createElement(`canvas`);
         tempCanvas.width = sw;
         tempCanvas.height = sh;

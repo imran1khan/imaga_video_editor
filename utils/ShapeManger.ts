@@ -59,14 +59,15 @@ export class ShapeManager {
     }
     drawShapes() {
         if (!this.ctx) return;
+        // we have to add elips and shapes made of points
         this.shapesArray.forEach(shape => {
             if (shape.type === 'arc') {
                 const arcShape = shape as arc2;
                 this.drawArc(arcShape);
             }
             if (shape.type === 'rectangle2') {
-                const {startPoint,endPoint}=shape;
-                this.drawRectangleWithArc(startPoint.x, startPoint.y, endPoint.x-startPoint.x, endPoint.y-startPoint.y);
+                const {startPoint,endPoint,angle}=shape;
+                this.drawRectangleWithArc(startPoint.x, startPoint.y, endPoint.x-startPoint.x, endPoint.y-startPoint.y,{rotation:angle});
             }
             if (shape.type==='line') {
                 const {startPoint,endPoint}=shape;

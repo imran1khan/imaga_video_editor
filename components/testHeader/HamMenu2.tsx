@@ -1,17 +1,19 @@
 import { GitHubLogoIcon, HamburgerMenuIcon } from '@radix-ui/react-icons'
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Button } from '../ui/button'
 import { CreditCard, FolderOpen, Keyboard, Moon, PenIcon, Pipette, Settings, Sun, User } from 'lucide-react'
 import useToggelThem from '../ToggelThem/ToggelThem';
 import { useRecoilState, useRecoilValue, useSetRecoilState } from 'recoil';
 import { colorPickerAtom, ColorPickerPopUpAtom, selectedColorAtom } from '@/packages/store/drawingAtom/ColorPickerAtom';
+import { ImageFileListAtom } from '@/packages/store/atoms/ImageFileAtom';
+import { downloadImageFile } from '@/packages/store/atoms/DownLoadImage';
 
 const style = 'w-7 h-7 rounded-sm cursor-pointer hover:outline hover:outline-1 dark:hover:outline-white hover:outline-gray-950';
 function HamMenu2() {
-  const [hide,setHide]=useState(true);
-  const [colorPickHide,setColorPickHide]=useState(true);
+  const [hide, setHide] = useState(true);
+  const [colorPickHide, setColorPickHide] = useState(true);
   const { Theme, setTheme } = useToggelThem();
-  const [ColorList,setColorList] = useRecoilState(colorPickerAtom);
+  const [ColorList, setColorList] = useRecoilState(colorPickerAtom);
   const [color, setColor] = useRecoilState(selectedColorAtom);
   const showColorPicker = useSetRecoilState(ColorPickerPopUpAtom);
   const showDiv = (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
@@ -27,23 +29,73 @@ function HamMenu2() {
     });
   }
 
-  const SaveColor=(e:React.MouseEvent<HTMLButtonElement, MouseEvent>)=>{
+  const SaveColor = (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
     const newArr = [...ColorList];
-    if (newArr.length>=5) {
+    if (newArr.length >= 5) {
       newArr.pop();
     }
-    const arr = [color,...newArr]
+    const arr = [color, ...newArr]
     setColorList(arr);
   };
-  const deleteColor=(e:React.MouseEvent<HTMLButtonElement, MouseEvent>)=>{
-    const newColorList = ColorList.filter((val)=> val !== color)
+  const deleteColor = (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
+    const newColorList = ColorList.filter((val) => val !== color)
     // i want at least 5 color so i am adding a color 
     setColorList(newColorList);
   }
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const setImageElement = useSetRecoilState(ImageFileListAtom);
+  const fileInputFunction = useCallback((e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
+    if (!fileInputRef.current || !fileInputRef) {
+      return;
+    }
+    const fileinput = fileInputRef.current;
+    fileinput.click();
+    fileinput.onchange = () => {
+      if (!fileinput.files || fileinput.files.length < 1) {
+        console.log(`file is either null or no value ${fileinput.files}`);
+        return;
+      }
+      const file = fileinput.files[0];
+      if (!file) {
+        console.log(`no fil found ${file}`);
+        return;
+      }
+      // setImageFile(file);
+
+      // setting the image on the imageList Atom for testing
+      const image = new Image();
+      const objUrl = URL.createObjectURL(file);
+      image.src = objUrl;
+      image.onload = () => {
+        setImageElement((p) => {
+          return [image, ...p]
+        });
+      }
+    }
+  }, [setImageElement]);
+  const setDownLoadImageFile = useSetRecoilState(downloadImageFile);
+  const downloadImageFunction = useCallback(async (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
+    setDownLoadImageFile(true);
+}, [setDownLoadImageFile]);
   return (
     <div className='relative'>
-      <Button onClick={()=>{setHide(p=>!p)}} className='dark:bg-slate-900 bg-slate-400' variant={'outline'}><HamburgerMenuIcon width={15} height={15} /></Button>
+      <Button onClick={() => { setHide(p => !p) }} className='dark:bg-slate-900 bg-slate-400' variant={'outline'}><HamburgerMenuIcon width={15} height={15} /></Button>
       <div hidden={hide} className='absolute w-[14rem] h-[20rem] bg-gray-400 dark:bg-gray-900 mt-2 rounded-sm p-2'>
+        <div className='flex justify-between text-sm cursor-pointer hover:bg-slate-800 rounded-md p-2' onClick={fileInputFunction}>
+          <div className='flex items-center'>
+            <FolderOpen className="mr-2 h-4 w-4" />
+            <input ref={fileInputRef} type="file" accept="image/*" src="" alt="" className="hidden" />
+            <span>open</span>
+          </div>
+          <span>⇧⌘P</span>
+        </div>
+        <div className='flex justify-between text-sm cursor-pointer hover:bg-slate-800 rounded-md p-2' onClick={downloadImageFunction}>
+          <div className='flex items-center'>
+            <Keyboard className="mr-2 h-4 w-4" />
+            <span>download image</span>
+          </div>
+          <span>⇧⌘P</span>
+        </div>
         {
           menuList.map((val, i) => (<DropMenu key={val.shortcut + i} icon={val.icon} shortcut={val.shortcut} title={val.title} />))
         }
@@ -63,7 +115,7 @@ function HamMenu2() {
           <div className='flex gap-2'>
             {ColorList.map((val, i) => (<div key={val + i} style={{ backgroundColor: val }} onClick={() => { setColor(val) }} className={style}></div>))}
             <div className='dark:bg-slate-400 bg-slate-800 h-8 w-[0.5px]'></div>
-            <div onClick={()=>{setColorPickHide(p=>!p)}} style={{ backgroundColor: color }} className={style}></div>
+            <div onClick={() => { setColorPickHide(p => !p) }} style={{ backgroundColor: color }} className={style}></div>
           </div>
           {/* tooltip color selector */}
           <div hidden={colorPickHide} className='dark:bg-slate-900 bg-slate-400 w-[12rem] h-[7rem] absolute top-[1.7rem] left-[14rem] rounded-md p-2'>
@@ -209,33 +261,27 @@ function DropMenu({ icon, shortcut, title }: prop) {
 }
 const menuList = [
   {
-    icon: <FolderOpen className="mr-2 h-4 w-4" />,
-    title: 'open',
-    shortcut: '⇧⌘P'
-  },
-  {
     icon: <User className="mr-2 h-4 w-4" />,
     title: 'profile',
-    shortcut: '⇧⌘P'
+    shortcut: '⇧⌘P',
+    onClick: ()=>{}
   },
   {
     icon: <CreditCard className="mr-2 h-4 w-4" />,
     title: 'Billing',
-    shortcut: '⇧⌘P'
+    shortcut: '⇧⌘P',
+    onClick: ()=>{}
   },
   {
     icon: <Settings className="mr-2 h-4 w-4" />,
     title: 'settings',
-    shortcut: '⇧⌘P'
-  },
-  {
-    icon: <Keyboard className="mr-2 h-4 w-4" />,
-    title: 'download image',
-    shortcut: '⇧⌘P'
+    shortcut: '⇧⌘P',
+    onClick: ()=>{}
   },
   {
     icon: <GitHubLogoIcon className="mr-2 h-4 w-4" />,
     title: 'GitHub',
-    shortcut: '⇧⌘P'
+    shortcut: '⇧⌘P',
+    onClick: ()=>{}
   },
 ]

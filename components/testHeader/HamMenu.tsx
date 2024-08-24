@@ -18,7 +18,7 @@ import React, { useCallback, useRef } from 'react'
 import { Button } from '../ui/button'
 import { GitHubLogoIcon, HamburgerMenuIcon } from '@radix-ui/react-icons'
 import { Cloud, CreditCard, FolderOpen, Keyboard, LifeBuoy, LogOut, Mail, MessageSquare, Moon, Plus, PlusCircle, Settings, Sun, User, UserPlus, Users } from 'lucide-react'
-import { ImageFileAtom, ImageFileListAtom } from "@/packages/store/atoms/ImageFileAtom"
+import { ImageFileListAtom } from "@/packages/store/atoms/ImageFileAtom"
 import { useRecoilState, useSetRecoilState } from "recoil"
 import { downloadImageFile } from "@/packages/store/atoms/DownLoadImage"
 import useToggelThem from "../ToggelThem/ToggelThem"
