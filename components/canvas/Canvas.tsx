@@ -1,4 +1,3 @@
-// import useCanvas from "@/Hooks/useCanvas";
 import { useCanvasClass } from "@/Hooks/useCanvasClass";
 import { memo, useId, useRef } from "react";
 

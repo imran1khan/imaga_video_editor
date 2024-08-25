@@ -1,7 +1,8 @@
-import { arc, arc2, line, point2, rectangle, rectangle2, shape } from "./Interface";
+import { arc, arc2, line, pointsArray, point2, rectangle, rectangle2, shape } from "./Interface";
 
 export class ShapeManager {
     public shapesArray: shape[] = [];
+    public penShapes:pointsArray[]=[];
     private ctx: CanvasRenderingContext2D | null = null;
 
     constructor(ctx: CanvasRenderingContext2D) {
@@ -31,16 +32,25 @@ export class ShapeManager {
             }
             else if (this.shapesArray[i].type==='line') {
                 const {startPoint,endPoint}=this.shapesArray[i] as line;
-                const linelength = this.calculateDistance(startPoint,endPoint);
-                const P1_dist =  this.calculateDistance(startPoint,{x,y});
-                const p2_dist = this.calculateDistance(endPoint,{x,y});
-                const tolerance = 1;
-                if (Math.abs(p2_dist+P1_dist-linelength)<=tolerance) {
+                if (this.isPointOnTheline(startPoint,endPoint,{x,y})) {
                     return i;
                 }
             }
         }
         return null;
+    }
+    isMouseOverCustomShape(x:number,y:number){
+        for (let i = 0; i < this.penShapes.length; i++) {
+            const shape = this.penShapes[i];
+            for (let j = 0; j < shape.length-1; j++) {
+                const A = shape[j];
+                const B = shape[j+1];
+                if (this.isPointOnTheline(A,B,{x,y},{tolerance:5})) {
+                    return i
+                }
+            }
+        }
+        return -1;
     }
     findMaxMinPoints(p1:point2,p2:point2):{maxPoint:point2,minPoint:point2}{
         if (p1.x===p2.x && p1.y===p2.y) {
@@ -75,13 +85,33 @@ export class ShapeManager {
             }
         });
     }
-    
+    drawCustomShape(){
+        if (!this.ctx) return;
+        for (let i = 0; i < this.penShapes.length; i++) {
+            const shape = this.penShapes[i];
+            this.drawPenShape(shape);
+        }
+    }
+    drawPenShape(shape:pointsArray){
+        if (shape.length<2 || !this.ctx) {
+            return;
+        }
+        this.ctx.beginPath();
+        this.ctx.moveTo(shape[0].x,shape[0].y);
+        for (let i = 1; i < shape.length; i++) {
+            this.ctx.lineTo(shape[i].x,shape[i].y);
+        }
+        this.ctx.lineWidth = 5;
+        this.ctx.lineCap='round';
+        this.ctx.lineJoin='round';
+        this.ctx.stroke();
+        this.ctx.closePath();
+    }
     drawArc(arc: arc2,obj:{
         fillStyle?: string,
         strokeStyle?: string}={}
     ) {
         const { startPoint, radius, startAngle, endAngle, counterClockWise } = arc;
-
 
         const fillStyle = obj.fillStyle || "rgba(120, 126, 167, 0.18)";
         const strokeStyle = obj.strokeStyle || 'rgba(0, 39, 248, 1)';
@@ -128,7 +158,16 @@ export class ShapeManager {
         const dy = A.y - B.y;
         return Math.sqrt(dx*dx+dy*dy);
     }
-
+    isPointOnTheline(A:point2,B:point2,C:point2,obj:{tolerance?:number}={}){
+        const tolerance = obj.tolerance || 1;
+        // A and B makes line and we have to ckeck for C;
+        const AB = this.calculateDistance(A,B);
+        const AC =  this.calculateDistance(A,C);
+        const BC = this.calculateDistance(C,B);
+        if (Math.abs(AC+BC-AB)<=tolerance) {
+            return true;
+        }
+    }
     drawRectangleWithArc(
         x: number,
         y: number,

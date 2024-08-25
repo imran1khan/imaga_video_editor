@@ -1,7 +1,7 @@
 import { hexToRgb, RandomInt } from "@/lib/utils";
 import { FineTuneTypes } from "@/packages/store/atoms/FinetuneAtom";
 import { ImageEffect } from "./ImageEffect";
-import { arc, arc2, point, point2, rectangle, RGBA, shape } from "./Interface";
+import { arc, arc2, pointsArray, point, point2, rectangle, RGBA, shape } from "./Interface";
 import { ShapeManager } from "./ShapeManger";
 
 
@@ -23,8 +23,8 @@ interface ImagePosition {
     w:null|number,
     h:null|number
 }
-type Mode = 'none'|'drag'|'drawTriangle'|'InteractiveRactangle'|'imageResize'|'rotate'|'resize';
-export type drawingMode = `none`|`ractangle`|`arc`|'line';
+type Mode = 'none'|'drag'|'dragCustomShape'|'drawTriangle'|'InteractiveRactangle'|'imageResize'|'rotate'|'resize';
+export type drawingMode = `none`|`ractangle`|`arc`|'line'|'pen';
 interface imageEffectObject {
     px: number
     py: number
@@ -34,17 +34,6 @@ interface imageEffectObject {
 }
 
 export class CanvasDraw {
-    // private imageData: ImageValue = {
-    //     image: null,
-    //     sx: 0,
-    //     sy: 0,
-    //     sWidth: 0,
-    //     sHeight: 0,
-    //     dx: 0,
-    //     dy: 0,
-    //     dWidth: 0,
-    //     dHeight: 0,
-    // };
     public StaticCanvas: HTMLCanvasElement;
     public InteractiveCanvas:HTMLCanvasElement;
     public InteractiveCtx:CanvasRenderingContext2D|null;
@@ -79,6 +68,8 @@ export class CanvasDraw {
     public selectedShape:{shape:shape,index:number}|null=null;
     //show frame
     public showFrame:boolean=true;
+    // handdrawn shape
+    public customeShape:pointsArray|null=null;
     constructor(canvas: HTMLCanvasElement,interactiveCanvas:HTMLCanvasElement, image?: HTMLImageElement) {
         this.StaticCanvas = canvas
         this.InteractiveCanvas=interactiveCanvas;
@@ -144,7 +135,13 @@ export class CanvasDraw {
         const imagePos = this.IsMouseOverImage(mousePos.x,mousePos.y);
         const check = this.checkForFrameCorner(e);
         const index = this.ShapeManger?.isMouseOverTheShape(mousePos.x,mousePos.y);
-        if (index!==null && index!==undefined && this.drawMode==='none') {
+        const customeShapeIndex = this.ShapeManger!.isMouseOverCustomShape(mousePos.x,mousePos.y);
+        if (customeShapeIndex>-1) {
+            const shape=this.ShapeManger!.penShapes[customeShapeIndex];
+            this.MoveShape={index:customeShapeIndex,dx:e.clientX-shape[0].x,dy:e.clientY-shape[0].y};
+            this.mode='dragCustomShape';
+        }
+        else if (index!==null && index!==undefined && this.drawMode==='none') {
             const shape = this.ShapeManger!.shapesArray[index];
             this.mode='drag';
             const {startPoint} = this.ShapeManger!.shapesArray[index];
@@ -201,6 +198,10 @@ export class CanvasDraw {
             this.startDrawing=true;
             this.startPoint = {x:e.clientX,y:e.clientY};
         }
+        if (this.drawMode === 'pen') {
+            this.customeShape=[{x:e.clientX,y:e.clientY}];
+            this.startDrawing=true;
+        }
     }
     mouseMoveInteractive(e:MouseEvent){
         if (this.mode==='InteractiveRactangle' && !this.startDrawing) {
@@ -216,7 +217,7 @@ export class CanvasDraw {
                 this.drawCanvas();
                 this.currentShape={...shape,angle:New_Angle}
                 this.ShapeManger?.drawRectangleWithArc(shape.startPoint.x,shape.startPoint.y,shape.endPoint.x-shape.startPoint.x,shape.endPoint.y-shape.startPoint.y,{rotation:New_Angle});
-            }
+            };
         }
         if (this.mode === `drag`) {
             if (this.MoveShape) {
@@ -226,7 +227,22 @@ export class CanvasDraw {
             else {
                 this.dragMoveImage2(e);
             }
+            this.ShapeManger?.drawCustomShape();
             this.ShapeManger?.drawShapes();
+        }
+        if (this.mode==='dragCustomShape' && this.MoveShape) {
+            const {index,dx,dy}=this.MoveShape;
+            const shape = this.ShapeManger!.penShapes[index];
+            const newFirstPoint = {x:e.clientX-dx,y:e.clientY-dy};
+            const deltaX = newFirstPoint.x-shape[0].x;
+            const deltaY = newFirstPoint.y-shape[0].y;
+            for (let i = 1; i < shape.length; i++) {
+                shape[i].x+=deltaX;
+                shape[i].y+=deltaY;
+            }
+            shape[0]=newFirstPoint;
+            this.ShapeManger!.penShapes[index]=shape;
+            this.ShapeManger?.drawCustomShape();
         }
         else if (this.mode==='resize' && this.resizeShape) {
             const shape = this.ShapeManger!.shapesArray[this.resizeShape.index];
@@ -294,6 +310,10 @@ export class CanvasDraw {
             this.ShapeManger?.drawShapes();
             this.ShapeManger?.drawLine(startPoint,endpoint);
         }
+        if (this.drawMode==='pen' && this.startDrawing && this.customeShape) {
+            this.customeShape=[...this.customeShape,{x:e.clientX,y:e.clientY}];
+            this.ShapeManger?.drawPenShape(this.customeShape);
+        }
         const check = this.checkForFrameCorner(e);
         if (check===null) {
             this.showSelection(e);
@@ -305,7 +325,7 @@ export class CanvasDraw {
             ctx?.clearRect(0,0,this.InteractiveCanvas.width,this.InteractiveCanvas.height);
             this.mode='none';   
         }
-        if (this.mode===`drag`) {
+        if (this.mode===`drag` || this.mode ==='dragCustomShape') {
             this.mode='none'
             this.MoveShape=null
         }
@@ -337,6 +357,10 @@ export class CanvasDraw {
                 this.ShapeManger!.shapesArray[index]={...shape,angle:this.currentShape.angle}
             }
             this.mode='none';
+        }
+        if (this.drawMode==='pen' && this.customeShape) {
+            this.ShapeManger?.penShapes.push(this.customeShape);
+            this.customeShape=null;
         }
         this.startDrawing = false;
     }
@@ -475,7 +499,7 @@ export class CanvasDraw {
         this.SelectedImage.py=image.py;
         const {AdjustedImageCordinate}=this.getAllCordinate(this.SelectedImage.index);
         // this.clear();
-        this.setBackgroundColorHex(this.StaticCanvasColor);
+        // this.setBackgroundColorHex(this.StaticCanvasColor);
         this.clearInteractive();
         this.drawCanvas();
         this.drawFrame(AdjustedImageCordinate.topLeft.x,AdjustedImageCordinate.topLeft.y,AdjustedImageCordinate.bottomRight.x-AdjustedImageCordinate.topLeft.x,AdjustedImageCordinate.bottomRight.y-AdjustedImageCordinate.topLeft.y);

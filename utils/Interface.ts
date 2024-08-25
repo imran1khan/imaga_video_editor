@@ -50,5 +50,5 @@ export interface arc2 extends shapeUnit {
     endAngle:number,
     counterClockWise:boolean,
 }
-
-export type shape =  arc | arc2 | rectangle2 | line;
+export type pointsArray = point2[];
+export type shape =  arc | arc2 | rectangle2 | line ;

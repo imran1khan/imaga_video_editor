@@ -24,6 +24,7 @@ export const useCanvasClass=(canvasId:string,interactiveCanvasId:string)=>{
     const [saveFilter,setSaveFilter]=useRecoilState(SaveFilterAtom);
     const [imageFilterArray,setImageFilterArray]  = useRecoilState(FineTuneAtomArray);
     const [canvasReady,setCanvasReady]=useState(false);
+    
     useEffect(()=>{
         const canvas = document.getElementById(canvasId) as HTMLCanvasElement;
         const interactiveCanvas = document.getElementById(interactiveCanvasId) as HTMLCanvasElement;
