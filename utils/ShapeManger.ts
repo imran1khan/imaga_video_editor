@@ -96,6 +96,7 @@ export class ShapeManager {
         if (shape.length<2 || !this.ctx) {
             return;
         }
+        this.ctx.save();
         this.ctx.beginPath();
         this.ctx.moveTo(shape[0].x,shape[0].y);
         for (let i = 1; i < shape.length; i++) {
@@ -106,6 +107,7 @@ export class ShapeManager {
         this.ctx.lineJoin='round';
         this.ctx.stroke();
         this.ctx.closePath();
+        this.ctx.restore();
     }
     drawArc(arc: arc2,obj:{
         fillStyle?: string,
