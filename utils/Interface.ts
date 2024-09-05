@@ -50,5 +50,11 @@ export interface arc2 extends shapeUnit {
     endAngle:number,
     counterClockWise:boolean,
 }
+export interface text {
+    startPoint:point2;
+    content:string;
+    width:number,
+    height:number,
+}
 export type pointsArray = point2[];
 export type shape =  arc | arc2 | rectangle2 | line ;

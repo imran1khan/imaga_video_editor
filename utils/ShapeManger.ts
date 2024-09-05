@@ -1,9 +1,10 @@
-import { arc, arc2, line, pointsArray, point2, rectangle, rectangle2, shape } from "./Interface";
+import { arc, arc2, line, pointsArray, point2, rectangle, rectangle2, shape, text } from "./Interface";
 
 export class ShapeManager {
     public shapesArray: shape[] = [];
     public penShapes:pointsArray[]=[];
     private ctx: CanvasRenderingContext2D | null = null;
+    public textContent:text[]=[];
 
     constructor(ctx: CanvasRenderingContext2D) {
         this.ctx = ctx;
@@ -108,6 +109,40 @@ export class ShapeManager {
         this.ctx.stroke();
         this.ctx.closePath();
         this.ctx.restore();
+    }
+    drawAlltextContent(){
+        for (let i = 0; i < this.textContent.length; i++) {
+            this.drawText(this.textContent[i].content,this.textContent[i].startPoint.x,this.textContent[i].startPoint.y);
+        }
+    }
+    drawText(text:string,x:number,y:number,obj:{maxWidth?:number}={}){
+        if (!this.ctx) return;
+        this.ctx.save();
+        this.ctx.textBaseline='top';
+        this.ctx.font = '20px Arial';
+        this.ctx.fillStyle = 'black';
+        const lines = text.split('\n');
+        const lineHeight=24;
+        let totalWidth=0;
+        lines.forEach((v,i)=>{
+            const lineWidth = this.ctx!.measureText(v).width;
+            totalWidth=Math.max(totalWidth,lineWidth);
+            this.ctx!.fillText(v,x,y+(lineHeight*i));
+        });
+        this.ctx.restore();
+        const totalHeight = lineHeight*lines.length;
+        return {
+            x,y,totalHeight,totalWidth
+        }
+    }
+    isPointOntheText(p:point2){
+        for (let i = 0; i < this.textContent.length; i++) {
+            const {height,startPoint,width}=this.textContent[i];
+            if (p.x>=startPoint.x && p.y>=startPoint.y && p.x<=startPoint.x+width && p.y<=startPoint.y+height) {
+                return i;
+            }
+        }
+        return null;
     }
     drawArc(arc: arc2,obj:{
         fillStyle?: string,

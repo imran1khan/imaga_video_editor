@@ -1,7 +1,7 @@
 import { hexToRgb, RandomInt } from "@/lib/utils";
 import { FineTuneTypes } from "@/packages/store/atoms/FinetuneAtom";
 import { ImageEffect } from "./ImageEffect";
-import { arc, arc2, pointsArray, point, point2, rectangle, RGBA, shape } from "./Interface";
+import { arc, arc2, pointsArray, point, point2, rectangle, RGBA, shape, text } from "./Interface";
 import { ShapeManager } from "./ShapeManger";
 
 
@@ -24,7 +24,8 @@ interface ImagePosition {
     h:null|number
 }
 type Mode = 'none'|'drag'|'dragCustomShape'|'drawTriangle'|'InteractiveRactangle'|'imageResize'|'rotate'|'resize';
-export type drawingMode = `none`|`ractangle`|`arc`|'line'|'pen';
+export type drawingMode = `none`|`ractangle`|`arc`|'line'|'pen'|'text'|'eraser';
+type shapeType = 'text'|'shape'|'customeShape'|'image';
 interface imageEffectObject {
     px: number
     py: number
@@ -32,7 +33,7 @@ interface imageEffectObject {
     height: number
     imageEffectObj: ImageEffect
 }
-
+export const curserStyle = 'url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAAAAXNSR0IArs4c6QAAAOBJREFUOE9jZKAyYKSyeQzDwMD////7MDAw6EGD5hIjI+MWfMGE08sggz59+jTr5s2bnPv27eMFGeLk5PRZXV39Ox8fXxoug7EaCDLs58+fa0NDQ9k2b96M4iBfX1+G1atX/2JnZw/GZihWAz9+/PgsJiZGEt0wmMkgQ5csWfKcn59fCt37GAaCXHf69OnFZmZmAvjC6tSpUx9MTU1j0V2JzcCqzs7OpoqKCmZ8BnZ0dPwtLy+vY2RkbENWRxcDqetlkPOpGikgA6mebGCGUi1hI8ca1bIeucXaMCi+SPU6AHSTjhWHMn6TAAAAAElFTkSuQmCC") 10 10, auto';
 export class CanvasDraw {
     public StaticCanvas: HTMLCanvasElement;
     public InteractiveCanvas:HTMLCanvasElement;
@@ -63,13 +64,24 @@ export class CanvasDraw {
     public StaticCanvasColor:string='';
     public MoveShape:{index:number,dx:number,dy:number}|null=null;
     public resizeShape:{index:number,dx:number,dy:number,closePoint:point2}|null=null;
-    // for roating he shape
+    // for roating the shape
     public startAngle:{angle:number,center:point2}|null=null;
     public selectedShape:{shape:shape,index:number}|null=null;
+    public selectedShape2:{element:shapeType,index:number}|null=null;
     //show frame
     public showFrame:boolean=true;
     // handdrawn shape
     public customeShape:pointsArray|null=null;
+    // text typeing
+    // public isTypeing:boolean=false;
+    public text:string='';
+    public textPoint:point2|null=null;
+    public startText:boolean=false;
+    public dragText:{index:number,dx:number,dy:number}|null=null;
+    //eraser
+    public eraser:boolean=false;
+    // current curserStyle
+    public curseStyle:string='default';
     constructor(canvas: HTMLCanvasElement,interactiveCanvas:HTMLCanvasElement, image?: HTMLImageElement) {
         this.StaticCanvas = canvas
         this.InteractiveCanvas=interactiveCanvas;
@@ -94,6 +106,7 @@ export class CanvasDraw {
         this.InteractiveCanvas.addEventListener(`mouseup`,this.mouseUpInteractive.bind(this));
         this.InteractiveCanvas.addEventListener(`click`,this.mouseClickInteractive.bind(this));
         this.InteractiveCanvas.addEventListener(`wheel`,this.onWheel.bind(this));
+        document.addEventListener(`keydown`,this.keyDown.bind(this));
     }
     removeEventListinerInterative(){
         this.InteractiveCanvas.removeEventListener(`mousedown`,this.mouseDownInteractive.bind(this));
@@ -101,6 +114,7 @@ export class CanvasDraw {
         this.InteractiveCanvas.removeEventListener(`mouseup`,this.mouseUpInteractive.bind(this));
         this.InteractiveCanvas.removeEventListener(`click`,this.mouseClickInteractive.bind(this));
         this.InteractiveCanvas.removeEventListener(`wheel`,this.onWheel.bind(this));
+        document.removeEventListener(`keydown`,this.keyDown.bind(this));
     }
     addEventListeners_Static() {
         window.addEventListener(`resize`, (e) => { });
@@ -111,7 +125,9 @@ export class CanvasDraw {
     mouseClickInteractive(e:MouseEvent){
         const mousePos = this.getMousePostion2(e).InteractiveCanvas;
         const imagePos = this.IsMouseOverImage(mousePos.x,mousePos.y);
-        const shapeIndex = this.ShapeManger?.isMouseOverTheShape(mousePos.x,mousePos.y);
+        const shapeIndex = this.ShapeManger!.isMouseOverTheShape(mousePos.x,mousePos.y);
+        const index = this.ShapeManger!.isPointOntheText({x:e.clientX,y:e.clientY});
+        const customeShapeIndex = this.ShapeManger!.isMouseOverCustomShape(e.clientX,e.clientY);
         if (shapeIndex!==null && shapeIndex!==undefined) {
             const shape = this.ShapeManger!.shapesArray[shapeIndex];
             this.selectedShape={shape:shape,index:shapeIndex};
@@ -119,6 +135,13 @@ export class CanvasDraw {
             if (this.showFrame) {
                 this.FrameAround_Shape(shape);
             }
+            this.selectedShape2={element:'shape',index:shapeIndex};
+        }
+        if (index!==null && this.showFrame) {
+            const {startPoint,height,width}=this.ShapeManger!.textContent[index];
+            this.clearInteractive();
+            this.drawFrame(startPoint.x,startPoint.y,width,height,{space:9,squareSize:10});
+            this.selectedShape2={element:'text',index:index};
         }
         if (imagePos.index!==null && imagePos.px!==null && imagePos.py!==null) {
             // const image = this.imageEffectObj[imagePos.index];
@@ -127,6 +150,19 @@ export class CanvasDraw {
             if (this.showFrame) {
                 this.drawFrame(AdjustedImageCordinate.topLeft.x,AdjustedImageCordinate.topLeft.y,AdjustedImageCordinate.bottomRight.x-AdjustedImageCordinate.topLeft.x,AdjustedImageCordinate.bottomRight.y-AdjustedImageCordinate.topLeft.y);
             }
+            this.selectedShape2={element:'image',index:imagePos.index};
+        }
+        if (customeShapeIndex>-1) {
+            const customeShape=this.ShapeManger!.penShapes[customeShapeIndex];
+            const {maxPoints,minPoints} = this.getMaxMin_points(customeShape);
+            this.clearInteractive();
+            this.drawFrame(minPoints.x,minPoints.y,maxPoints.x-minPoints.x,maxPoints.y-minPoints.y);
+            this.selectedShape2={element:'customeShape',index:customeShapeIndex};
+        }
+        else if (this.drawMode==='text') {
+            if (!this.startText) {
+                this.startText=true;
+            }
         }
     }
     mouseDownInteractive(e:MouseEvent){
@@ -134,8 +170,10 @@ export class CanvasDraw {
         //mouse position of the drawing canvas and the intercative canvas is going to be same
         const imagePos = this.IsMouseOverImage(mousePos.x,mousePos.y);
         const check = this.checkForFrameCorner(e);
-        const index = this.ShapeManger?.isMouseOverTheShape(mousePos.x,mousePos.y);
+        const index = this.ShapeManger!.isMouseOverTheShape(mousePos.x,mousePos.y);
         const customeShapeIndex = this.ShapeManger!.isMouseOverCustomShape(mousePos.x,mousePos.y);
+        const textIndex = this.ShapeManger!.isPointOntheText({x:e.clientX,y:e.clientY});
+        
         if (customeShapeIndex>-1) {
             const shape=this.ShapeManger!.penShapes[customeShapeIndex];
             this.MoveShape={index:customeShapeIndex,dx:e.clientX-shape[0].x,dy:e.clientY-shape[0].y};
@@ -158,6 +196,11 @@ export class CanvasDraw {
                     this.resizeShape={index:index,dx:e.clientX-closePoint.x!,dy:e.clientY-closePoint.y!,closePoint:closePoint};
                 }
             }
+        }
+        else if (textIndex!==null) {
+            this.mode='drag';
+            const {startPoint}=this.ShapeManger!.textContent[textIndex];
+            this.dragText = {index:textIndex,dx:e.clientX-startPoint.x,dy:e.clientY-startPoint.y};
         }
         else if (check!==null && check<4 && this.SelectedImage.index!==null) {
             this.mode='imageResize';
@@ -202,8 +245,30 @@ export class CanvasDraw {
             this.customeShape=[{x:e.clientX,y:e.clientY}];
             this.startDrawing=true;
         }
+        if (this.drawMode==='eraser') {
+            this.eraser=true;
+        }
     }
     mouseMoveInteractive(e:MouseEvent){
+        if (this.drawMode==='eraser' && this.eraser) {
+            const {x,y}={x:e.clientX,y:e.clientY};
+            const shapeManager = this.ShapeManger!;
+            const actions=[
+                { index: shapeManager.isPointOntheText({ x, y }), array: shapeManager.textContent },
+                { index: shapeManager.isMouseOverCustomShape(x, y), array: shapeManager.penShapes },
+                { index: shapeManager.isMouseOverTheShape(x, y), array: shapeManager.shapesArray },
+                { index: this.IsMouseOverImage(x, y).index, array: this.imageEffectObj }
+            ];
+            actions.forEach(({ index, array }) => {
+                if (index !== null && index >= 0) {
+                    array.splice(index, 1);
+                }
+            });
+            this.drawCanvas();
+            this.ShapeManger?.drawCustomShape();
+            this.ShapeManger?.drawShapes();
+            this.ShapeManger?.drawAlltextContent();
+        }
         if (this.mode==='InteractiveRactangle' && !this.startDrawing) {
             this.clearInteractive();
             this.drawRectangle(this.InterativeRectangle.x,this.InterativeRectangle.y,e.clientX-this.InterativeRectangle.x,e.clientY-this.InterativeRectangle.y);
@@ -215,34 +280,39 @@ export class CanvasDraw {
             const {shape,index}=this.selectedShape!;
             if (shape.type==='rectangle2') {
                 this.drawCanvas();
-                this.currentShape={...shape,angle:New_Angle}
+                this.currentShape={...shape,angle:New_Angle};
                 this.ShapeManger?.drawRectangleWithArc(shape.startPoint.x,shape.startPoint.y,shape.endPoint.x-shape.startPoint.x,shape.endPoint.y-shape.startPoint.y,{rotation:New_Angle});
             };
         }
-        if (this.mode === `drag`) {
-            if (this.MoveShape) {
-                this.drawCanvas()
+        if (this.mode === `drag`|| this.mode==='dragCustomShape') {
+            this.drawCanvas();
+            if (this.mode==='drag' && this.MoveShape) {
                 this.dragMoveShape(e);
+            }
+            else if (this.mode==='dragCustomShape' && this.MoveShape) {
+                const {index,dx,dy}=this.MoveShape;
+                const shape = this.ShapeManger!.penShapes[index];
+                const newFirstPoint = {x:e.clientX-dx,y:e.clientY-dy};
+                const deltaX = newFirstPoint.x-shape[0].x;
+                const deltaY = newFirstPoint.y-shape[0].y;
+                for (let i = 1; i < shape.length; i++) {
+                    shape[i].x+=deltaX;
+                    shape[i].y+=deltaY;
+                }
+                shape[0]=newFirstPoint;
+                this.ShapeManger!.penShapes[index]=shape;
+            }
+            else if (this.dragText) {
+                const newX = e.clientX-this.dragText.dx;
+                const newY = e.clientY-this.dragText.dy;
+                this.ShapeManger!.textContent[this.dragText.index].startPoint={x:newX,y:newY};
             }
             else {
                 this.dragMoveImage2(e);
             }
             this.ShapeManger?.drawCustomShape();
             this.ShapeManger?.drawShapes();
-        }
-        if (this.mode==='dragCustomShape' && this.MoveShape) {
-            const {index,dx,dy}=this.MoveShape;
-            const shape = this.ShapeManger!.penShapes[index];
-            const newFirstPoint = {x:e.clientX-dx,y:e.clientY-dy};
-            const deltaX = newFirstPoint.x-shape[0].x;
-            const deltaY = newFirstPoint.y-shape[0].y;
-            for (let i = 1; i < shape.length; i++) {
-                shape[i].x+=deltaX;
-                shape[i].y+=deltaY;
-            }
-            shape[0]=newFirstPoint;
-            this.ShapeManger!.penShapes[index]=shape;
-            this.ShapeManger?.drawCustomShape();
+            this.ShapeManger?.drawAlltextContent();
         }
         else if (this.mode==='resize' && this.resizeShape) {
             const shape = this.ShapeManger!.shapesArray[this.resizeShape.index];
@@ -328,6 +398,7 @@ export class CanvasDraw {
         if (this.mode===`drag` || this.mode ==='dragCustomShape') {
             this.mode='none'
             this.MoveShape=null
+            this.dragText=null;
         }
         if (this.mode==='resize' && this.currentShape && this.resizeShape) {
             this.ShapeManger?.shapesArray.splice(this.resizeShape.index,1);
@@ -363,6 +434,7 @@ export class CanvasDraw {
             this.customeShape=null;
         }
         this.startDrawing = false;
+        this.eraser=false;
     }
     onWheel(e: WheelEvent) {
         if (e.ctrlKey) {
@@ -371,6 +443,27 @@ export class CanvasDraw {
             const zoom = e.deltaY < 0 ? 1.1 : 0.9;
             // this.zoom(mousePos.x,mousePos.y,zoom);
             this.zoom2(mousePos.x, mousePos.y, zoom);
+        }
+    }
+    keyDown(e:KeyboardEvent){
+        if (e.key === "Delete" && this.selectedShape2) {
+            const shapeManager = this.ShapeManger!;
+            const actions=[
+                { type: 'text', array: shapeManager.textContent },
+                { type: 'customeShape', array: shapeManager.penShapes },
+                { type: 'shape', array: shapeManager.shapesArray },
+                { type: 'image', array: this.imageEffectObj }
+            ];
+            actions.forEach(({type,array})=>{
+                if (this.selectedShape2!.element===type) {
+                    array.splice(this.selectedShape2!.index,1);
+                }
+            });
+            this.drawCanvas();
+            this.ShapeManger?.drawCustomShape();
+            this.ShapeManger?.drawShapes();
+            this.ShapeManger?.drawAlltextContent();
+            this.selectedShape2=null;
         }
     }
     // zoom(mouseX: number, mouseY: number, zoom: number) {
@@ -509,7 +602,7 @@ export class CanvasDraw {
             return;   
         }
         const {index,dx,dy}=this.MoveShape;
-        const shape = this.ShapeManger?.shapesArray[index];
+        const shape = this.ShapeManger!.shapesArray[index];
         let newX:number;
         let newY:number;
         if (shape?.type==='arc') {
@@ -667,26 +760,59 @@ export class CanvasDraw {
             this.drawFrame(x1,y1,w,h,{space:5,squareSize:10});
         }
         else if (shape.type === 'rectangle2') {
-            const {startPoint,endPoint}=shape
-            this.drawFrame(startPoint.x,startPoint.y,endPoint.x-startPoint.x,endPoint.y-startPoint.y);
+            const {startPoint,endPoint,angle}=shape
+            this.drawFrame(startPoint.x,startPoint.y,endPoint.x-startPoint.x,endPoint.y-startPoint.y,{angle:angle});
+            // the bewlow code is for a frame drawn over the shape and it's working
+            const mid_Point={x:startPoint.x+(endPoint.x-startPoint.x)/2,y:startPoint.y+(endPoint.y-startPoint.y)/2};
+            const newStartPoint = this.getRotated_Point(startPoint,mid_Point,angle);
+            const newEndPoint = this.getRotated_Point(endPoint,mid_Point,angle);
+            const topRightPoint = this.getRotated_Point({x:endPoint.x,y:startPoint.y},mid_Point,angle);
+            const bottomleftPoint = this.getRotated_Point({x:startPoint.x,y:endPoint.y},mid_Point,angle);
+            this.InteractiveCtx!.save();
+            this.InteractiveCtx!.beginPath();
+            this.InteractiveCtx!.moveTo(newStartPoint.x,newStartPoint.y);
+            this.InteractiveCtx!.lineTo(topRightPoint.x,topRightPoint.y);
+            this.InteractiveCtx!.lineTo(newEndPoint.x,newEndPoint.y);
+            this.InteractiveCtx!.lineTo(bottomleftPoint.x,bottomleftPoint.y);
+            this.InteractiveCtx!.closePath();
+            this.InteractiveCtx!.strokeStyle = "rgba(255, 15, 15, 0.8)"
+            this.InteractiveCtx!.stroke();
+            this.InteractiveCtx!.restore();
         }
-    }    
-    drawFrame(x: number, y: number, w: number, h: number, obj: { squareSize: number, space: number } = { squareSize: 10, space: 10 }) {
+    };
+    getRotated_Point(A: point2, C: point2, angle: number): point2 {
+        const cosTheta = Math.cos(angle);
+        const sinTheta = Math.sin(angle);
+        const newX = C.x + (A.x - C.x) * cosTheta - (A.y - C.y) * sinTheta;
+        const newY = C.y + (A.x - C.x) * sinTheta + (A.y - C.y) * cosTheta;
+        return { x: newX, y: newY };
+    }
+    drawFrame(x: number, y: number, w: number, h: number, obj: { squareSize?: number, space?: number,angle?:number } = { }) {
         // Calculate the new frame position with the given space
-        const newX = x - obj.space;
-        const newY = y - obj.space;
-        const lastX = x + w + obj.space;
-        const lastY = y + h + obj.space;
+        const space = obj.space||10;
+        const squareSize=obj.squareSize||10
+        const angle = obj.angle || 0;
+
+        const newX = x - space;
+        const newY = y - space;
+        const lastX = x + w + space;
+        const lastY = y + h + space;
     
         // Draw the four small rectangles (corners)
         const corners = [
             { x: newX, y: newY }, // top-left
-            { x: lastX - obj.squareSize, y: newY }, // top-right
-            { x: lastX - obj.squareSize, y: lastY - obj.squareSize }, // bottom-right
-            { x: newX, y: lastY - obj.squareSize }, // bottom-left
+            { x: lastX - squareSize, y: newY }, // top-right
+            { x: lastX - squareSize, y: lastY - squareSize }, // bottom-right
+            { x: newX, y: lastY - squareSize }, // bottom-left
         ];
+        // we have to add a roation method here
+        const mid_Point={x:newX+(lastX-newX)/2,y:newY+(lastY-newY)/2};
+        this.InteractiveCtx!.save();
+        this.InteractiveCtx!.translate(mid_Point.x,mid_Point.y);
+        this.InteractiveCtx!.rotate(angle);
+        this.InteractiveCtx!.translate(-mid_Point.x,-mid_Point.y);
         corners.forEach(corner => {
-            this.drawRectangle(corner.x, corner.y, obj.squareSize, obj.squareSize);
+            this.drawRectangle(corner.x, corner.y, squareSize, squareSize);
         });
         // draw a circle on the top
         const mx = newX+(lastX-newX)/2;
@@ -694,8 +820,10 @@ export class CanvasDraw {
         this.drawCircle(mx,my,5);
         // Draw the outer rectangle
         this.drawRectangle(newX, newY, lastX - newX, lastY - newY, { fillStyle: 'rgba(0, 0, 0, 0)', strokeStyle: 'rgba(248, 110, 181, 1)' });
+        this.InteractiveCtx!.restore();
+
         this.FrameCodinate.cornerRact = corners,
-        this.FrameCodinate.size=obj.squareSize;
+        this.FrameCodinate.size=squareSize;
         this.FrameCodinate.circlePoint={x:mx,y:my,radius:5};
     }
     showSelection(e: MouseEvent) {// basically this function show all the element which can be selected via mouse if mouse is above an element the mouse style is going to get change
@@ -711,7 +839,7 @@ export class CanvasDraw {
         }
         else {
             const target = e.target as HTMLElement;
-            target.style.cursor = `default`
+            target.style.cursor = this.curseStyle
         }
     }
     IsMouseOverImage(x: number, y: number) {
@@ -746,15 +874,13 @@ export class CanvasDraw {
             for (let i = 0; i < this.FrameCodinate.cornerRact.length; i++) {
                 if (this.IsMouseInsideReact({x:e.clientX,y:e.clientY},{x:this.FrameCodinate.cornerRact[i].x!,y:this.FrameCodinate.cornerRact[i].y!,w:this.FrameCodinate.size,h:this.FrameCodinate.size})) {
                     chack=i;
-                    break;
                 }
             }
         }
         const {x,y,radius}=this.FrameCodinate.circlePoint;// circle
         const dist = Math.hypot(e.clientX-x,e.clientY-y);
-        if (dist<=radius) {
+        if (dist<=radius && chack===null) {
             chack=4;
-            return chack;
         }
         //[0:top-left,1:top-right,2:bottom-right,3:bottom-left]
         if (chack===1 || chack===3) {
@@ -764,7 +890,7 @@ export class CanvasDraw {
             target.style.cursor = `nwse-resize`
         }
         else{
-            target.style.cursor = `default`
+            target.style.cursor = this.curseStyle;
         }
         return chack;
     }
