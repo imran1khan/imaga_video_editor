@@ -1,13 +1,17 @@
-import { arc, arc2, line, pointsArray, point2, rectangle, rectangle2, shape, text } from "./Interface";
+import { CanvasDraw } from "./CanvasClass";
+import { arc, arc2, line, pointsArray, point2, shape, text } from "./Interface";
+// import { arc, arc2, line, pointsArray, point2, rectangle, rectangle2, shape, text } from "./Interface";
 
 export class ShapeManager {
     public shapesArray: shape[] = [];
     public penShapes:pointsArray[]=[];
+    public polygonShapes:pointsArray[]=[];
     private ctx: CanvasRenderingContext2D | null = null;
     public textContent:text[]=[];
-
-    constructor(ctx: CanvasRenderingContext2D) {
+    private CanvasDraw:CanvasDraw;
+    constructor(ctx: CanvasRenderingContext2D,CanvasDraw:CanvasDraw) {
         this.ctx = ctx;
+        this.CanvasDraw=CanvasDraw;
     }
     setStartPosition(index:number,x:number,y:number){
         const shape = this.shapesArray[index];
@@ -23,14 +27,14 @@ export class ShapeManager {
                     return i;
                 }
             }
-            else if (this.shapesArray[i].type==='rectangle2') {
-                const shape=this.shapesArray[i] as rectangle2
-                const s1 = shape.startPoint;
-                const e1 = shape.endPoint;
-                if (x>=s1.x && x<=e1.x && y>=s1.y && y<=e1.y) {
-                    return i;
-                }
-            }
+            // else if (this.shapesArray[i].type==='rectangle2') {
+            //     const shape=this.shapesArray[i] as rectangle2
+            //     const s1 = shape.startPoint;
+            //     const e1 = shape.endPoint;
+            //     if (x>=s1.x && x<=e1.x && y>=s1.y && y<=e1.y) {
+            //         return i;
+            //     }
+            // }
             else if (this.shapesArray[i].type==='line') {
                 const {startPoint,endPoint}=this.shapesArray[i] as line;
                 if (this.isPointOnTheline(startPoint,endPoint,{x,y})) {
@@ -53,21 +57,6 @@ export class ShapeManager {
         }
         return -1;
     }
-    findMaxMinPoints(p1:point2,p2:point2):{maxPoint:point2,minPoint:point2}{
-        if (p1.x===p2.x && p1.y===p2.y) {
-            return {maxPoint:p1,minPoint:p2};
-        }
-        else if (p1.x===p2.x) {
-            return p1.y>p2.y?{maxPoint:p1,minPoint:p2}:{maxPoint:p2,minPoint:p1};
-        }
-        else {
-            const maxX = Math.max(p1.x,p2.x);
-            const minX = Math.min(p1.x,p2.x);
-            const maxPoint = maxX===p1.x?p1:p2;
-            const minPoint = minX===p1.x?p1:p2;
-            return {maxPoint,minPoint};
-        }
-    }
     drawShapes() {
         if (!this.ctx) return;
         // we have to add elips and shapes made of points
@@ -76,13 +65,29 @@ export class ShapeManager {
                 const arcShape = shape as arc2;
                 this.drawArc(arcShape);
             }
-            if (shape.type === 'rectangle2') {
-                const {startPoint,endPoint,angle}=shape;
-                this.drawRectangleWithArc(startPoint.x, startPoint.y, endPoint.x-startPoint.x, endPoint.y-startPoint.y,{rotation:angle});
-            }
+            // if (shape.type === 'rectangle2') {
+            //     const {startPoint,endPoint,angle}=shape;
+            //     this.drawRectangleWithArc(startPoint.x, startPoint.y, endPoint.x-startPoint.x, endPoint.y-startPoint.y,{rotation:angle});
+            // }
             if (shape.type==='line') {
                 const {startPoint,endPoint}=shape;
                 this.drawLine(startPoint,endPoint);
+            }
+        });
+    }
+    zoomShapes(zoom:number,centerPoint:point2){
+        this.shapesArray.forEach(shape => {
+            if (shape.type === 'arc') {
+                const arcShape = shape as arc2;
+                const newStartPoint = [arcShape.startPoint];
+                const newRadius = arcShape.radius*zoom;
+                this.CanvasDraw.scaledPolygon(newStartPoint,zoom,centerPoint);
+                shape.radius=newRadius;
+                shape.startPoint=newStartPoint[0];
+            }
+            else if (shape.type==='line') {
+                const {startPoint,endPoint}=shape;
+                this.CanvasDraw.scaledPolygon([startPoint,endPoint],zoom,centerPoint);
             }
         });
     }
@@ -107,19 +112,130 @@ export class ShapeManager {
         this.ctx.lineCap='round';
         this.ctx.lineJoin='round';
         this.ctx.stroke();
-        this.ctx.closePath();
         this.ctx.restore();
+    }
+    zoomPenShapes(zoom:number,centerPoint:point2){
+        for (let i = 0; i < this.penShapes.length; i++) {
+            const p = this.penShapes[i];
+            this.CanvasDraw.scaledPolygon(p,zoom,centerPoint);
+        }
+    }
+    drawPolygonShapes(){
+        if (!this.ctx) return;
+        for (let i = 0; i < this.polygonShapes.length; i++) {
+            const shape = this.polygonShapes[i];
+            this.drawIrregularPolygons(shape);
+        }
+    }
+    drawIrregularPolygons(shape:pointsArray){
+        if (shape.length<2 || !this.ctx) {
+            return;
+        }
+        this.ctx.save();
+        this.ctx.beginPath();
+        this.ctx.moveTo(shape[0].x,shape[0].y);
+        for (let i = 1; i < shape.length; i++) {
+            this.ctx.lineTo(shape[i].x,shape[i].y);
+        }
+        this.ctx.closePath();
+        this.ctx.lineWidth = 5;
+        this.ctx.lineCap='round';
+        this.ctx.lineJoin='round';
+        this.ctx.stroke();
+        this.ctx.restore();
+    }
+    zoomAllPolygon(zoom:number,centerPoint:point2){
+        for (let i = 0; i < this.polygonShapes.length; i++) {
+            const polygon = this.polygonShapes[i];
+            this.CanvasDraw.scaledPolygon(polygon,zoom,centerPoint);
+        }
+    }
+    isMouseOnPolygon(p: point2): number | null {
+        for (let i = 0; i < this.polygonShapes.length; i++) {
+            if (this.isPointOnPolygon(p, this.polygonShapes[i])) {
+                return i;
+            }
+        }
+        return null;
+    }
+    isPointOnPolygon(p: point2, shape: pointsArray): boolean {
+        let count = 0;
+        for (let i = 0; i < shape.length; i++) {
+            const p1 = shape[i];
+            const p2 = shape[(i + 1) % shape.length];
+            if (this.isPointOnEdge(p, p1, p2)) {
+                return true;
+            }
+            if (this.rayIntersectsLine(p, p1, p2)) {
+                count++;
+            }
+        }
+        return count % 2 === 1;
+    }
+    isPointOnEdge(point: point2, p1: point2, p2: point2): boolean {
+        const crossProduct = (point.y - p1.y) * (p2.x - p1.x) - (point.x - p1.x) * (p2.y - p1.y);
+        if (Math.abs(crossProduct) > Number.EPSILON) {
+            return false;
+        }
+        const dotProduct = (point.x - p1.x) * (p2.x - p1.x) + (point.y - p1.y) * (p2.y - p1.y);
+        if (dotProduct < 0) {
+            return false;
+        }
+        const squaredLength = (p2.x - p1.x) * (p2.x - p1.x) + (p2.y - p1.y) * (p2.y - p1.y);
+        return dotProduct <= squaredLength;
+    }
+    rayIntersectsLine(point: point2, p1: point2, p2: point2): boolean {
+        if (point.y < Math.min(p1.y, p2.y) || point.y > Math.max(p1.y, p2.y)) {
+            return false;
+        }
+        
+        if (p1.x === p2.x) {
+            return point.x <= p1.x;
+        }
+    
+        const slope = (p2.y - p1.y) / (p2.x - p1.x);
+        const intercept = p1.y - slope * p1.x;
+        const xIntersection = (point.y - intercept) / slope;
+
+        return xIntersection >= point.x;
+    }
+    
+    
+    rotateIrregularPolygons(shape:pointsArray,angle:number,obj:{centerPoint?:point2}={}){
+        let centerPoint:point2={x:0,y:0};
+        if (obj.centerPoint===undefined) {
+            for (let i = 0; i < shape.length; i++) {
+                centerPoint.x+=shape[i].x;
+                centerPoint.y+=shape[i].y;
+            }
+            centerPoint.x/=shape.length;
+            centerPoint.y/=shape.length;
+        }
+        else{
+            centerPoint=obj.centerPoint;
+        }
+
+        for (let i = 0; i < shape.length; i++) {
+            const p = shape[i];
+            shape[i] = this.CanvasDraw.getRotated_Point(p,centerPoint,angle);
+        }
+        // this.ctx!.save();
+        // this.ctx?.translate(centerPoint.x,centerPoint.y);
+        // this.ctx?.rotate(angle);
+        // this.ctx?.translate(-centerPoint.x,-centerPoint.y);
+        // this.drawIrregularPolygons(shape);
+        // this.ctx!.restore();
     }
     drawAlltextContent(){
         for (let i = 0; i < this.textContent.length; i++) {
-            this.drawText(this.textContent[i].content,this.textContent[i].startPoint.x,this.textContent[i].startPoint.y);
+            this.drawText(this.textContent[i].content,this.textContent[i].startPoint.x,this.textContent[i].startPoint.y,this.textContent[i].textSize);
         }
     }
-    drawText(text:string,x:number,y:number,obj:{maxWidth?:number}={}){
+    drawText(text:string,x:number,y:number,TextSize:number,obj:{maxWidth?:number}={}){
         if (!this.ctx) return;
         this.ctx.save();
         this.ctx.textBaseline='top';
-        this.ctx.font = '20px Arial';
+        this.ctx.font = `${TextSize}px Arial`;
         this.ctx.fillStyle = 'black';
         const lines = text.split('\n');
         const lineHeight=24;
@@ -133,6 +249,17 @@ export class ShapeManager {
         const totalHeight = lineHeight*lines.length;
         return {
             x,y,totalHeight,totalWidth
+        }
+    }
+    zoomText(zoom:number,centerPoint:point2){
+        for (let i = 0; i < this.textContent.length; i++) {
+            const text = this.textContent[i];
+            const points=[text.startPoint]
+            this.CanvasDraw.scaledPolygon(points,zoom,centerPoint);
+            this.textContent[i].textSize*=zoom;
+            this.textContent[i].width*=zoom;
+            this.textContent[i].height*=zoom;
+            this.textContent[i].startPoint=points[0];
         }
     }
     isPointOntheText(p:point2){
@@ -195,6 +322,18 @@ export class ShapeManager {
         const dy = A.y - B.y;
         return Math.sqrt(dx*dx+dy*dy);
     }
+    calculateDistance2(A: point2, B: point2) {
+        return Math.sqrt(Math.pow(B.x - A.x, 2) + Math.pow(B.y - A.y, 2));
+    }
+    angleBetweenPoints(A:point2,B:point2){
+        return Math.atan2(B.y-A.y,B.x-A.x);
+    }
+    toXY(length:number,angle:number,startPoint:point2={x:0,y:0}){
+        let p={x:0,y:0}
+        p.x = startPoint.x+length*Math.cos(angle);
+        p.y=startPoint.y+length*Math.sin(angle);
+        return p;
+    }
     isPointOnTheline(A:point2,B:point2,C:point2,obj:{tolerance?:number}={}){
         const tolerance = obj.tolerance || 1;
         // A and B makes line and we have to ckeck for C;
@@ -227,7 +366,7 @@ export class ShapeManager {
             return;
         }
         this.ctx.save();
-        //ratating the shape
+        //rotating the shape
         this.ctx.translate(x+w/2,y+h/2);
         this.ctx.rotate(rotation);
         this.ctx.translate(-x-w/2,-y-h/2);

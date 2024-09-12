@@ -146,9 +146,9 @@ export const useCanvasClass = (canvasId: string, interactiveCanvasId: string) =>
                 if (textArea.display === 'block') {
                     if (canvasClassRef.current.startText && content!=='') {
                         const startPoint = {x:textArea.left,y:textArea.top+7}
-                        const rect = canvasClassRef.current.ShapeManger!.drawText(content,textArea.left,textArea.top+7);
+                        const rect = canvasClassRef.current.ShapeManger!.drawText(content,textArea.left,textArea.top+7,20);
                         if (rect) {
-                            canvasClassRef.current.ShapeManger?.textContent.push({startPoint:startPoint,content:content,width:rect.totalWidth,height:rect.totalHeight});
+                            canvasClassRef.current.ShapeManger?.textContent.push({startPoint:startPoint,content:content,width:rect.totalWidth,height:rect.totalHeight,textSize:20});
                         }
                     }
                     setTextArea((p) => {
@@ -193,6 +193,7 @@ export const useCanvasClass = (canvasId: string, interactiveCanvasId: string) =>
                 canvasClassRef.current!.ShapeManger?.drawCustomShape();
                 canvasClassRef.current!.ShapeManger?.drawShapes();
                 canvasClassRef.current!.ShapeManger?.drawAlltextContent();
+
                 const textArea = document.getElementById('textarea1001') as HTMLTextAreaElement;
                 //setting the right width and height
                 const leftWidth = window.innerWidth-textContent2.startPoint.x;
@@ -208,6 +209,7 @@ export const useCanvasClass = (canvasId: string, interactiveCanvasId: string) =>
                 textArea.value=textContent2.content
                 textArea.style.top=textContent2.startPoint.y+'px'
                 textArea.style.left=textContent2.startPoint.x+'px'
+                textArea.style.fontSize=textContent2.textSize+'px';
                 textArea.style.display='block'
                 editText=true;
                 i=index;
@@ -216,8 +218,10 @@ export const useCanvasClass = (canvasId: string, interactiveCanvasId: string) =>
                 const textArea = document.getElementById('textarea1001') as HTMLTextAreaElement;
                 if (textArea.value!=='') {
                     textContent2.content=textArea.value;
+                    const fontSize = parseFloat(textArea.style.fontSize)||20;
 
-                    const rect = canvasClassRef.current!.ShapeManger!.drawText(textContent2.content,textContent2.startPoint.x,textContent2.startPoint.y);
+                    const rect = canvasClassRef.current!.ShapeManger!.drawText(textContent2.content,textContent2.startPoint.x,textContent2.startPoint.y,fontSize);
+
                     textContent2.width=rect!.totalWidth;
                     textContent2.height=rect!.totalHeight;
                     canvasClassRef.current!.ShapeManger!.textContent.push(textContent2);

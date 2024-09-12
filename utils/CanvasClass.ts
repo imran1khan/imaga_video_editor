@@ -1,7 +1,7 @@
 import { hexToRgb, RandomInt } from "@/lib/utils";
 import { FineTuneTypes } from "@/packages/store/atoms/FinetuneAtom";
 import { ImageEffect } from "./ImageEffect";
-import { arc, arc2, pointsArray, point, point2, rectangle, RGBA, shape, text } from "./Interface";
+import { arc, arc2, pointsArray, point, point2, RGBA, shape, text } from "./Interface";
 import { ShapeManager } from "./ShapeManger";
 
 
@@ -23,9 +23,9 @@ interface ImagePosition {
     w:null|number,
     h:null|number
 }
-type Mode = 'none'|'drag'|'dragCustomShape'|'drawTriangle'|'InteractiveRactangle'|'imageResize'|'rotate'|'resize';
+type Mode = 'none'|'drag'|'dragPolygon'|'dragCustomShape'|'drawTriangle'|'InteractiveRactangle'|'imageResize'|'rotate'|'resize';
 export type drawingMode = `none`|`ractangle`|`arc`|'line'|'pen'|'text'|'eraser';
-type shapeType = 'text'|'shape'|'customeShape'|'image';
+type shapeType = 'text'|'shape'|'customeShape'|'image'|'polygon';
 interface imageEffectObject {
     px: number
     py: number
@@ -68,6 +68,7 @@ export class CanvasDraw {
     public startAngle:{angle:number,center:point2}|null=null;
     public selectedShape:{shape:shape,index:number}|null=null;
     public selectedShape2:{element:shapeType,index:number}|null=null;
+    public selectedPolygon:{polygon:pointsArray,index:number}|null=null;
     //show frame
     public showFrame:boolean=true;
     // handdrawn shape
@@ -92,14 +93,25 @@ export class CanvasDraw {
             return;
         }
         // setting the initial color of the static canvas
-        this.ShapeManger = new ShapeManager(this.ctx)
+        this.ShapeManger = new ShapeManager(this.ctx,this)
         this.StaticCanvasColor = '#020617'
         this.adjustCanvas();
         if (image) {
             this.addImage(image)
             this.drawCanvas();
         }
+        this.animate = this.animate.bind(this);
+        // this.animate();
     };
+    animate(){
+        console.log('running')
+        this.drawCanvas();
+        this.ShapeManger?.drawCustomShape();
+        this.ShapeManger?.drawPolygonShapes();
+        this.ShapeManger?.drawShapes();
+        this.ShapeManger?.drawAlltextContent();
+        requestAnimationFrame(this.animate);
+    }
     addEventListinerInterative(){
         this.InteractiveCanvas.addEventListener(`mousedown`,this.mouseDownInteractive.bind(this));
         this.InteractiveCanvas.addEventListener(`mousemove`,this.mouseMoveInteractive.bind(this));
@@ -124,10 +136,11 @@ export class CanvasDraw {
     }
     mouseClickInteractive(e:MouseEvent){
         const mousePos = this.getMousePostion2(e).InteractiveCanvas;
-        const imagePos = this.IsMouseOverImage(mousePos.x,mousePos.y);
-        const shapeIndex = this.ShapeManger!.isMouseOverTheShape(mousePos.x,mousePos.y);
+        const imagePos = this.IsMouseOverImage(e.clientX,mousePos.y);
+        const shapeIndex = this.ShapeManger!.isMouseOverTheShape(e.clientX,e.clientY);
         const index = this.ShapeManger!.isPointOntheText({x:e.clientX,y:e.clientY});
         const customeShapeIndex = this.ShapeManger!.isMouseOverCustomShape(e.clientX,e.clientY);
+        const polygonIndex = this.ShapeManger!.isMouseOnPolygon({x:e.clientX,y:e.clientY});
         if (shapeIndex!==null && shapeIndex!==undefined) {
             const shape = this.ShapeManger!.shapesArray[shapeIndex];
             this.selectedShape={shape:shape,index:shapeIndex};
@@ -159,6 +172,14 @@ export class CanvasDraw {
             this.drawFrame(minPoints.x,minPoints.y,maxPoints.x-minPoints.x,maxPoints.y-minPoints.y);
             this.selectedShape2={element:'customeShape',index:customeShapeIndex};
         }
+        if (polygonIndex!==null) {
+            const polygonShape = this.ShapeManger!.polygonShapes[polygonIndex];
+            const {maxPoints,minPoints} = this.getMaxMin_points(polygonShape);
+            this.clearInteractive();
+            this.drawFrame(minPoints.x,minPoints.y,maxPoints.x-minPoints.x,maxPoints.y-minPoints.y);
+            this.selectedPolygon={polygon:polygonShape,index:polygonIndex};
+            this.selectedShape2={element:'polygon',index:polygonIndex};
+        }
         else if (this.drawMode==='text') {
             if (!this.startText) {
                 this.startText=true;
@@ -166,18 +187,24 @@ export class CanvasDraw {
         }
     }
     mouseDownInteractive(e:MouseEvent){
-        const mousePos = this.getMousePostion2(e).InteractiveCanvas;
+        // const mousePos = this.getMousePostion2(e).InteractiveCanvas;
         //mouse position of the drawing canvas and the intercative canvas is going to be same
-        const imagePos = this.IsMouseOverImage(mousePos.x,mousePos.y);
+        const imagePos = this.IsMouseOverImage(e.clientX,e.clientY);
         const check = this.checkForFrameCorner(e);
-        const index = this.ShapeManger!.isMouseOverTheShape(mousePos.x,mousePos.y);
-        const customeShapeIndex = this.ShapeManger!.isMouseOverCustomShape(mousePos.x,mousePos.y);
+        const index = this.ShapeManger!.isMouseOverTheShape(e.clientX,e.clientY);
+        const customeShapeIndex = this.ShapeManger!.isMouseOverCustomShape(e.clientX,e.clientY);
         const textIndex = this.ShapeManger!.isPointOntheText({x:e.clientX,y:e.clientY});
+        const polygonIndex =  this.ShapeManger!.isMouseOnPolygon({x:e.clientX,y:e.clientY});
         
         if (customeShapeIndex>-1) {
             const shape=this.ShapeManger!.penShapes[customeShapeIndex];
             this.MoveShape={index:customeShapeIndex,dx:e.clientX-shape[0].x,dy:e.clientY-shape[0].y};
             this.mode='dragCustomShape';
+        }
+        else if (polygonIndex!==null) {
+            const polygonShape = this.ShapeManger!.polygonShapes[polygonIndex];
+            this.MoveShape={index:polygonIndex,dx:e.clientX-polygonShape[0].x,dy:e.clientY-polygonShape[0].y};
+            this.mode='dragPolygon';
         }
         else if (index!==null && index!==undefined && this.drawMode==='none') {
             const shape = this.ShapeManger!.shapesArray[index];
@@ -206,28 +233,23 @@ export class CanvasDraw {
             this.mode='imageResize';
             this.corner=check
         }
-        else if (check===4) {
+        else if (check===4 && this.selectedPolygon) {
             this.mode='rotate';
-            if (this.selectedShape?.shape?.type==='rectangle2') {
-                const {startPoint,endPoint}=this.selectedShape.shape;
-                const w = endPoint.x-startPoint.x;
-                const h = endPoint.y-startPoint.y;
-                const cx = startPoint.x!+(w)/2;
-                const cy = startPoint.y!+(h)/2;
-                const angle = Math.atan2(e.clientY-cy,e.clientX-cx);
-                this.startAngle={angle:angle,center:{x:cx,y:cy}};
-            }
-
+            const {polygon,index}=this.selectedPolygon;
+            const {maxPoints,minPoints}=this.getMaxMin_points(polygon);
+            const centerPoint = {x:minPoints.x+(maxPoints.x-minPoints.x)/2,y:minPoints.y+(maxPoints.y-minPoints.y)/2};
+            const angle = Math.atan2(e.clientY-centerPoint.y,e.clientX-centerPoint.x);
+            this.startAngle={angle:angle,center:centerPoint}
         }
         else if (imagePos.index!==null && imagePos.px!==null && imagePos.py!==null) {
             this.mode='drag';
-            this.dragStartX = (mousePos.x - this.Origin.x) / this.scale - imagePos.px;
-            this.dragStartY = (mousePos.y - this.Origin.y) / this.scale - imagePos.py;
+            this.dragStartX = e.clientX-imagePos.px
+            this.dragStartY = e.clientY-imagePos.py
             this.SelectedImage = imagePos;
         }
         else {
             this.mode = `InteractiveRactangle`;
-            this.InterativeRectangle={x:mousePos.x,y:mousePos.y}
+            this.InterativeRectangle={x:e.clientX,y:e.clientY}
         }
         if (this.drawMode==='ractangle') {
             this.startDrawing = true;
@@ -257,7 +279,8 @@ export class CanvasDraw {
                 { index: shapeManager.isPointOntheText({ x, y }), array: shapeManager.textContent },
                 { index: shapeManager.isMouseOverCustomShape(x, y), array: shapeManager.penShapes },
                 { index: shapeManager.isMouseOverTheShape(x, y), array: shapeManager.shapesArray },
-                { index: this.IsMouseOverImage(x, y).index, array: this.imageEffectObj }
+                { index: this.IsMouseOverImage(x, y).index, array: this.imageEffectObj },
+                { index: shapeManager.isMouseOnPolygon({x, y}), array: shapeManager.polygonShapes }
             ];
             actions.forEach(({ index, array }) => {
                 if (index !== null && index >= 0) {
@@ -266,6 +289,7 @@ export class CanvasDraw {
             });
             this.drawCanvas();
             this.ShapeManger?.drawCustomShape();
+            this.ShapeManger?.drawPolygonShapes();
             this.ShapeManger?.drawShapes();
             this.ShapeManger?.drawAlltextContent();
         }
@@ -277,14 +301,14 @@ export class CanvasDraw {
             const {center,angle}=this.startAngle!;
             const currentAngle = Math.atan2(e.clientY-center.y,e.clientX-center.x);
             const New_Angle = currentAngle-angle;
-            const {shape,index}=this.selectedShape!;
-            if (shape.type==='rectangle2') {
-                this.drawCanvas();
-                this.currentShape={...shape,angle:New_Angle};
-                this.ShapeManger?.drawRectangleWithArc(shape.startPoint.x,shape.startPoint.y,shape.endPoint.x-shape.startPoint.x,shape.endPoint.y-shape.startPoint.y,{rotation:New_Angle});
-            };
+            const {polygon,index}=this.selectedPolygon!;
+            this.drawCanvas();
+            this.ShapeManger!.rotateIrregularPolygons(polygon,New_Angle,{centerPoint:center});
+            this.ShapeManger!.drawIrregularPolygons(polygon);
+            this.customeShape=polygon;
+            this.startAngle!.angle=currentAngle;
         }
-        if (this.mode === `drag`|| this.mode==='dragCustomShape') {
+        if (this.mode === `drag`|| this.mode==='dragCustomShape' || this.mode==='dragPolygon') {
             this.drawCanvas();
             if (this.mode==='drag' && this.MoveShape) {
                 this.dragMoveShape(e);
@@ -302,6 +326,19 @@ export class CanvasDraw {
                 shape[0]=newFirstPoint;
                 this.ShapeManger!.penShapes[index]=shape;
             }
+            else if (this.mode==='dragPolygon' && this.MoveShape) {
+                const {index,dx,dy}=this.MoveShape;
+                const polygonShape = this.ShapeManger!.polygonShapes[index];
+                const newStartPoint = {x:e.clientX-dx,y:e.clientY-dy};
+                const deltaX = newStartPoint.x-polygonShape[0].x;
+                const deltaY = newStartPoint.y-polygonShape[0].y;
+                for (let i = 1; i < polygonShape.length; i++) {
+                    polygonShape[i].x+=deltaX;
+                    polygonShape[i].y+=deltaY;
+                }
+                polygonShape[0]=newStartPoint;
+                this.ShapeManger!.polygonShapes[index]=polygonShape;
+            }
             else if (this.dragText) {
                 const newX = e.clientX-this.dragText.dx;
                 const newY = e.clientY-this.dragText.dy;
@@ -310,6 +347,7 @@ export class CanvasDraw {
             else {
                 this.dragMoveImage2(e);
             }
+            this.ShapeManger?.drawPolygonShapes();
             this.ShapeManger?.drawCustomShape();
             this.ShapeManger?.drawShapes();
             this.ShapeManger?.drawAlltextContent();
@@ -348,15 +386,20 @@ export class CanvasDraw {
             if (!this.startPoint.x || !this.startPoint.y) {
                 return;
             }
-            const w = e.clientX-this.startPoint.x;
-            const h = e.clientY-this.startPoint.y;
-            
-            const p1={x:this.startPoint.x,y:this.startPoint.y}
-            const p2={x:e.clientX,y:e.clientY}
-            this.currentShape={type:'rectangle2',startPoint:p1,endPoint:p2,angle:0}
             this.drawCanvas();
             this.ShapeManger?.drawShapes();
-            this.ShapeManger?.drawRectangleWithArc(this.startPoint.x,this.startPoint.y,w,h,{rotation:this.currentShape.angle});
+            this.ShapeManger?.drawPolygonShapes();
+            this.ShapeManger?.drawCustomShape();
+            this.ShapeManger?.drawAlltextContent();
+            
+            const points = [
+                {x:this.startPoint.x,y:this.startPoint.y},
+                {x:e.clientX,y:this.startPoint.y},
+                {x:e.clientX,y:e.clientY},
+                {x:this.startPoint.x,y:e.clientY},
+            ];
+            this.ShapeManger?.drawIrregularPolygons(points);
+            this.customeShape=points;
         }
         if (this.drawMode==='arc' && this.startDrawing) {
             if (!this.startPoint.x || !this.startPoint.y) {
@@ -366,6 +409,10 @@ export class CanvasDraw {
             this.currentShape = {type:'arc',startPoint:{x:this.startPoint.x,y:this.startPoint.y},radius:radius,startAngle:0,endAngle:2*Math.PI,counterClockWise:false};
             this.drawCanvas();
             this.ShapeManger?.drawShapes();
+            this.ShapeManger?.drawPolygonShapes();
+            this.ShapeManger?.drawCustomShape();
+            this.ShapeManger?.drawAlltextContent();
+
             this.ShapeManger?.drawLine({x:this.startPoint.x,y:this.startPoint.y},{x:e.clientX,y:e.clientY},{setLineDesh:[5,3]});
             this.ShapeManger?.drawArc(this.currentShape);
         }
@@ -378,6 +425,10 @@ export class CanvasDraw {
             this.currentShape={type:'line',startPoint:startPoint,endPoint:endpoint};
             this.drawCanvas();
             this.ShapeManger?.drawShapes();
+            this.ShapeManger?.drawPolygonShapes();
+            this.ShapeManger?.drawCustomShape();
+            this.ShapeManger?.drawAlltextContent();
+
             this.ShapeManger?.drawLine(startPoint,endpoint);
         }
         if (this.drawMode==='pen' && this.startDrawing && this.customeShape) {
@@ -395,7 +446,7 @@ export class CanvasDraw {
             ctx?.clearRect(0,0,this.InteractiveCanvas.width,this.InteractiveCanvas.height);
             this.mode='none';   
         }
-        if (this.mode===`drag` || this.mode ==='dragCustomShape') {
+        if (this.mode===`drag` || this.mode ==='dragCustomShape' || this.mode==='dragPolygon') {
             this.mode='none'
             this.MoveShape=null
             this.dragText=null;
@@ -411,22 +462,29 @@ export class CanvasDraw {
             this.corner=null;
             this.mode='none'
         }
+        if (this.drawMode==='ractangle' && this.customeShape!=null) {
+            this.ShapeManger?.polygonShapes.push(this.customeShape);
+            this.customeShape=null;
+            this.startPoint={x:null,y:null};
+        }
         if (this.startDrawing && this.currentShape) {
-            if (this.currentShape.type === 'rectangle2' || this.currentShape.type === 'line') {
-                const {startPoint,endPoint}=this.currentShape;
-                const {minPoint,maxPoint}=this.ShapeManger!.findMaxMinPoints(startPoint,endPoint);
-                this.currentShape.startPoint=minPoint;
-                this.currentShape.endPoint=maxPoint;
-            }
+            // if (this.currentShape.type === 'line') {
+            //     const {startPoint,endPoint}=this.currentShape;
+            //     const {minPoints,maxPoints}=this.getMaxMin_points([startPoint,endPoint]);
+            //     this.currentShape.startPoint=minPoints;
+            //     this.currentShape.endPoint=maxPoints;
+            // }
             this.ShapeManger?.shapesArray.push(this.currentShape);
             this.startPoint={x:null,y:null};
             this.currentShape=null;
         }
-        if (this.mode==='rotate' && this.selectedShape) {
-            const {index,shape}=this.selectedShape;
-            if (this.currentShape?.type==='rectangle2' && shape.type==='rectangle2') {
-                this.ShapeManger!.shapesArray[index]={...shape,angle:this.currentShape.angle}
-            }
+        if (this.mode==='rotate' && this.selectedPolygon) {
+            // const {index,shape}=this.selectedShape;
+            // if (this.currentShape?.type==='rectangle2' && shape.type==='rectangle2') {
+            //     this.ShapeManger!.shapesArray[index]={...shape,angle:this.currentShape.angle}
+            // }
+            const {polygon,index}=this.selectedPolygon;
+            this.ShapeManger!.polygonShapes[index]=polygon;
             this.mode='none';
         }
         if (this.drawMode==='pen' && this.customeShape) {
@@ -439,10 +497,7 @@ export class CanvasDraw {
     onWheel(e: WheelEvent) {
         if (e.ctrlKey) {
             e.preventDefault();
-            const mousePos = this.getMousePostion(e);
-            const zoom = e.deltaY < 0 ? 1.1 : 0.9;
-            // this.zoom(mousePos.x,mousePos.y,zoom);
-            this.zoom2(mousePos.x, mousePos.y, zoom);
+            this.zoom(e);
         }
     }
     keyDown(e:KeyboardEvent){
@@ -452,7 +507,8 @@ export class CanvasDraw {
                 { type: 'text', array: shapeManager.textContent },
                 { type: 'customeShape', array: shapeManager.penShapes },
                 { type: 'shape', array: shapeManager.shapesArray },
-                { type: 'image', array: this.imageEffectObj }
+                { type: 'image', array: this.imageEffectObj },
+                { type: 'polygon', array: shapeManager.polygonShapes }
             ];
             actions.forEach(({type,array})=>{
                 if (this.selectedShape2!.element===type) {
@@ -466,37 +522,48 @@ export class CanvasDraw {
             this.selectedShape2=null;
         }
     }
-    // zoom(mouseX: number, mouseY: number, zoom: number) {
-    //     if (this.scale > 20000 && zoom === 1.1) {
-    //         return;
-    //     }
-    //     else if (this.scale < 0.04 && zoom === 0.9) {
-    //         return;
-    //     }
-    //     const previousScale = this.scale;
-    //     this.scale *= zoom;
-    //     this.imageData.dx = mouseX - ((mouseX - this.imageData.dx) * this.scale / previousScale);
-    //     this.imageData.dy = mouseY - ((mouseY - this.imageData.dy) * this.scale / previousScale);
-    //     // this.drawImage();
-    // }
-    zoom2(mouseX: number, mouseY: number, zoom: number) {
-        const previousScale = this.scale;
-        this.scale *= zoom;
+    zoom(e: WheelEvent) {
+        const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+        const minScale = 0.5;
+        const maxScale = 2.0;
 
-        const scaledWidth = this.StaticCanvas.width * this.scale;
-        const scaledHeight = this.StaticCanvas.height * this.scale;
-
-        if (scaledWidth < this.StaticCanvas.width || scaledHeight < this.StaticCanvas.height) {
-            this.scale = previousScale;
-            return;
-        }
-        const dx = (mouseX - this.Origin.x) * (this.scale - previousScale) / this.scale;
-        const dy = (mouseY - this.Origin.y) * (this.scale - previousScale) / this.scale;
-        this.Origin.x -= dx;
-        this.Origin.y -= dy;
-        this.clear();
-        this.ctx?.setTransform(1, 0, 0, 1, 0, 0);
+        let newScale = this.scale*zoomFactor;
+        newScale = Math.max(minScale, Math.min(maxScale, newScale));
+        const effectiveZoom = newScale / this.scale;
+        this.scale = newScale;
+        const cPoint={ x: e.clientX, y: e.clientY }
+        this.zoomInImages(cPoint, effectiveZoom);
+        this.ShapeManger?.zoomAllPolygon(effectiveZoom,cPoint);
+        this.ShapeManger?.zoomPenShapes(effectiveZoom,cPoint);
+        this.ShapeManger?.zoomShapes(effectiveZoom,cPoint);
+        this.ShapeManger?.zoomText(effectiveZoom,cPoint);
+        // redraw everything
         this.drawCanvas();
+        this.ShapeManger?.drawPolygonShapes();
+        this.ShapeManger?.drawCustomShape();
+        this.ShapeManger?.drawShapes();
+        this.ShapeManger?.drawAlltextContent();
+        
+    }
+    zoomInImages(centerPoint:point2,zoom:number){
+        this.imageEffectObj.forEach(image=>{
+            const {height,width,px,py}=image;
+            const shape = [{x:px,y:py},{x:px+width,y:py+height}];
+            this.scaledPolygon(shape,zoom,centerPoint);
+            const [s,e]=shape;
+            image.px=s.x;
+            image.py=s.y;
+            image.height=e.y-s.y;
+            image.width=e.x-s.x
+        });
+    }
+    scaledPolygon(shape:pointsArray,zoom:number,centerPoint:point2={x:0,y:0}){
+        shape.forEach(p=>{
+            const dx = p.x-centerPoint.x;
+            const dy = p.y-centerPoint.y;
+            p.x = centerPoint.x+dx*zoom;
+            p.y = centerPoint.y+dy*zoom;
+        })
     }
     resizeImage(e: MouseEvent, corner: number, maintainAspectRatio: boolean) {
         if (this.SelectedImage.index === null) {
@@ -585,8 +652,8 @@ export class CanvasDraw {
             return;
         }
         const mousePos = this.getMousePostion(e);
-        this.imageEffectObj[this.SelectedImage.index].px=(mousePos.x-this.Origin.x)/this.scale-this.dragStartX;
-        this.imageEffectObj[this.SelectedImage.index].py=(mousePos.y-this.Origin.y)/this.scale-this.dragStartY;
+        this.imageEffectObj[this.SelectedImage.index].px=e.clientX-this.dragStartX;
+        this.imageEffectObj[this.SelectedImage.index].py=e.clientY-this.dragStartY;
         const image = this.imageEffectObj[this.SelectedImage.index];
         this.SelectedImage.px=image.px;
         this.SelectedImage.py=image.py;
@@ -610,15 +677,15 @@ export class CanvasDraw {
             newY = e.clientY-dy;
             this.ShapeManger?.setStartPosition(index,newX,newY);
         }
-        else if (shape?.type==='rectangle2') {
-            newX = e.clientX-dx;
-            newY = e.clientY-dy;
-            const {endPoint,startPoint}=shape;
-            const w = endPoint.x-startPoint.x;
-            const h = endPoint.y-startPoint.y;
-            const newEndPoint={x:newX+w,y:newY+h};
-            this.ShapeManger!.shapesArray[index]={...shape,startPoint:{x:newX,y:newY},endPoint:newEndPoint}
-        }
+        // else if (shape?.type==='rectangle2') {
+        //     newX = e.clientX-dx;
+        //     newY = e.clientY-dy;
+        //     const {endPoint,startPoint}=shape;
+        //     const w = endPoint.x-startPoint.x;
+        //     const h = endPoint.y-startPoint.y;
+        //     const newEndPoint={x:newX+w,y:newY+h};
+        //     this.ShapeManger!.shapesArray[index]={...shape,startPoint:{x:newX,y:newY},endPoint:newEndPoint}
+        // }
         else if (shape?.type==='line') {
             newX = e.clientX-dx;
             newY = e.clientY-dy;
@@ -664,8 +731,8 @@ export class CanvasDraw {
             radii?: number;
         } = {}
     ) {
-        const fillStyle = obj.fillStyle || "rgba(255, 147, 203, 0.04)";
-        const strokeStyle = obj.strokeStyle || 'rgba(248, 110, 181, 1)';
+        const fillStyle = obj.fillStyle || "rgba(0, 0, 0, 1)";
+        const strokeStyle = obj.strokeStyle || 'rgba(255, 255, 255, 1)';
         const radii = obj.radii || 0;
     
         const validatedRadii = Math.max(radii, 0);
@@ -677,6 +744,7 @@ export class CanvasDraw {
         this.InteractiveCtx.save();
         this.InteractiveCtx.fillStyle = fillStyle;
         this.InteractiveCtx.strokeStyle = strokeStyle;
+        this.InteractiveCtx.lineWidth = 0.8;
         this.InteractiveCtx.beginPath();
         this.InteractiveCtx.roundRect(x, y, w, h, validatedRadii);
         this.InteractiveCtx.fill();
@@ -759,38 +827,49 @@ export class CanvasDraw {
             const h=2*radius!;
             this.drawFrame(x1,y1,w,h,{space:5,squareSize:10});
         }
-        else if (shape.type === 'rectangle2') {
-            const {startPoint,endPoint,angle}=shape
-            this.drawFrame(startPoint.x,startPoint.y,endPoint.x-startPoint.x,endPoint.y-startPoint.y,{angle:angle});
-            // the bewlow code is for a frame drawn over the shape and it's working
-            const mid_Point={x:startPoint.x+(endPoint.x-startPoint.x)/2,y:startPoint.y+(endPoint.y-startPoint.y)/2};
-            const newStartPoint = this.getRotated_Point(startPoint,mid_Point,angle);
-            const newEndPoint = this.getRotated_Point(endPoint,mid_Point,angle);
-            const topRightPoint = this.getRotated_Point({x:endPoint.x,y:startPoint.y},mid_Point,angle);
-            const bottomleftPoint = this.getRotated_Point({x:startPoint.x,y:endPoint.y},mid_Point,angle);
-            this.InteractiveCtx!.save();
-            this.InteractiveCtx!.beginPath();
-            this.InteractiveCtx!.moveTo(newStartPoint.x,newStartPoint.y);
-            this.InteractiveCtx!.lineTo(topRightPoint.x,topRightPoint.y);
-            this.InteractiveCtx!.lineTo(newEndPoint.x,newEndPoint.y);
-            this.InteractiveCtx!.lineTo(bottomleftPoint.x,bottomleftPoint.y);
-            this.InteractiveCtx!.closePath();
-            this.InteractiveCtx!.strokeStyle = "rgba(255, 15, 15, 0.8)"
-            this.InteractiveCtx!.stroke();
-            this.InteractiveCtx!.restore();
-        }
+        // else if (shape.type === 'rectangle2') {
+        //     const {startPoint,endPoint,angle}=shape
+        //     this.drawFrame(startPoint.x,startPoint.y,endPoint.x-startPoint.x,endPoint.y-startPoint.y,{angle:angle});
+        //     // the bewlow code is for a frame drawn over the shape and it's working
+        //     // this.drawFrame2(startPoint,endPoint,angle);
+        // }
     };
     getRotated_Point(A: point2, C: point2, angle: number): point2 {
         const cosTheta = Math.cos(angle);
         const sinTheta = Math.sin(angle);
-        const newX = C.x + (A.x - C.x) * cosTheta - (A.y - C.y) * sinTheta;
-        const newY = C.y + (A.x - C.x) * sinTheta + (A.y - C.y) * cosTheta;
+        const newX = C.x + ((A.x - C.x) * cosTheta - (A.y - C.y) * sinTheta);
+        const newY = C.y + ((A.x - C.x) * sinTheta + (A.y - C.y) * cosTheta);
         return { x: newX, y: newY };
+    }
+    getRotated_Point2(A: point2, C: point2, angle: number){
+        const dist = this.ShapeManger!.calculateDistance2(A,C);
+        const originalAngle = Math.atan2(A.y - C.y, A.x - C.x);
+        const newAngle = originalAngle + angle;
+        const newX = C.x + dist * Math.cos(newAngle);
+        const newY = C.y + dist * Math.sin(newAngle);
+        return { x: newX, y: newY };
+    }
+    drawFrame2(startPoint:point2,endPoint:point2,angle:number){
+        const mid_Point={x:startPoint.x+(endPoint.x-startPoint.x)/2,y:startPoint.y+(endPoint.y-startPoint.y)/2};
+        const newStartPoint = this.getRotated_Point(startPoint,mid_Point,angle);
+        const newEndPoint = this.getRotated_Point(endPoint,mid_Point,angle);
+        const topRightPoint = this.getRotated_Point({x:endPoint.x,y:startPoint.y},mid_Point,angle);
+        const bottomleftPoint = this.getRotated_Point({x:startPoint.x,y:endPoint.y},mid_Point,angle);
+        this.InteractiveCtx!.save();
+        this.InteractiveCtx!.beginPath();
+        this.InteractiveCtx!.moveTo(newStartPoint.x,newStartPoint.y);
+        this.InteractiveCtx!.lineTo(topRightPoint.x,topRightPoint.y);
+        this.InteractiveCtx!.lineTo(newEndPoint.x,newEndPoint.y);
+        this.InteractiveCtx!.lineTo(bottomleftPoint.x,bottomleftPoint.y);
+        this.InteractiveCtx!.closePath();
+        this.InteractiveCtx!.strokeStyle = "rgba(255, 15, 15, 0.8)"
+        this.InteractiveCtx!.stroke();
+        this.InteractiveCtx!.restore();
     }
     drawFrame(x: number, y: number, w: number, h: number, obj: { squareSize?: number, space?: number,angle?:number } = { }) {
         // Calculate the new frame position with the given space
-        const space = obj.space||10;
-        const squareSize=obj.squareSize||10
+        const space = obj.space||12;
+        const squareSize=obj.squareSize||8
         const angle = obj.angle || 0;
 
         const newX = x - space;
@@ -812,14 +891,16 @@ export class CanvasDraw {
         this.InteractiveCtx!.rotate(angle);
         this.InteractiveCtx!.translate(-mid_Point.x,-mid_Point.y);
         corners.forEach(corner => {
-            this.drawRectangle(corner.x, corner.y, squareSize, squareSize);
+            // this.drawRectangle(corner.x, corner.y, squareSize, squareSize);
+            this.drawRectangleWithArc(corner.x, corner.y, squareSize, squareSize,{radii:2});
         });
         // draw a circle on the top
         const mx = newX+(lastX-newX)/2;
         const my = newY-20;
-        this.drawCircle(mx,my,5);
+        this.drawCircle(mx,my,4);
         // Draw the outer rectangle
         this.drawRectangle(newX, newY, lastX - newX, lastY - newY, { fillStyle: 'rgba(0, 0, 0, 0)', strokeStyle: 'rgba(248, 110, 181, 1)' });
+
         this.InteractiveCtx!.restore();
 
         this.FrameCodinate.cornerRact = corners,
@@ -827,12 +908,9 @@ export class CanvasDraw {
         this.FrameCodinate.circlePoint={x:mx,y:my,radius:5};
     }
     showSelection(e: MouseEvent) {// basically this function show all the element which can be selected via mouse if mouse is above an element the mouse style is going to get change
-        const mousePos = this.getMousePostion(e);
-        const adjustedMouseX = (mousePos.x - this.Origin.x) / this.scale;
-        const adjustedMouseY = (mousePos.y - this.Origin.y) / this.scale;
 
-        const imagePos = this.IsMouseOverImage(adjustedMouseX, adjustedMouseY);
-        // const imagePos = this.IsMouseOverImage(mousePos.x, mousePos.y);// this is not working but above one is working a little bit
+        const imagePos = this.IsMouseOverImage(e.clientX, e.clientY);
+        // const imagePos = this.IsMouseOverImage(e.clientX, e.clientY);// this is not working but above one is working a little bit
         if (imagePos.px !== null && imagePos.py !== null && imagePos.index !== null) {
             const target = e.target as HTMLElement;
             target.style.cursor = `move`
@@ -845,10 +923,10 @@ export class CanvasDraw {
     IsMouseOverImage(x: number, y: number) {
         let ImagePosition: ImagePosition = { px: null, py: null, index: null,w:null,h:null }
         for (let i = 0; i < this.imageEffectObj.length; i++) {
-            const maxX = Math.max(this.imageEffectObj[i].px + this.imageEffectObj[i].width * this.scale,this.imageEffectObj[i].px);
-            const minX = Math.min(this.imageEffectObj[i].px + this.imageEffectObj[i].width * this.scale,this.imageEffectObj[i].px);
-            const maxY =Math.max(this.imageEffectObj[i].py + this.imageEffectObj[i].height * this.scale,this.imageEffectObj[i].py);
-            const minY=Math.min(this.imageEffectObj[i].py + this.imageEffectObj[i].height * this.scale,this.imageEffectObj[i].py);
+            const maxX = Math.max(this.imageEffectObj[i].px + this.imageEffectObj[i].width,this.imageEffectObj[i].px);
+            const minX = Math.min(this.imageEffectObj[i].px + this.imageEffectObj[i].width,this.imageEffectObj[i].px);
+            const maxY =Math.max(this.imageEffectObj[i].py + this.imageEffectObj[i].height,this.imageEffectObj[i].py);
+            const minY=Math.min(this.imageEffectObj[i].py + this.imageEffectObj[i].height,this.imageEffectObj[i].py);
             if (x<=maxX && x>=minX && y<=maxY && y>=minY) {
                 ImagePosition = { px: this.imageEffectObj[i].px, py: this.imageEffectObj[i].py, index: i,w:this.imageEffectObj[i].width,h:this.imageEffectObj[i].height }
                 break;
@@ -915,21 +993,6 @@ export class CanvasDraw {
         }
         return -1;
     }
-    // setBorder() {
-    //     if (!this.ctx || !this.imageData.image) {
-    //         return;
-    //     }
-    //     this.ctx.save();
-    //     this.ctx.translate(this.imageData.dx, this.imageData.dy);
-    //     this.ctx.scale(this.scale, this.scale);
-    //     if (this.ctx.strokeStyle !== 'transparent') {
-    //         this.ctx.lineWidth = 2 / this.ctx.getTransform().a;
-    //         this.ctx.strokeStyle = '#976cf5';
-    //         this.ctx.strokeRect(0, 0, this.imageData.image.width, this.imageData.image.height);
-    //         // this.ctx.strokeRect(this.imageData.dx, this.imageData.dy, this.imageData.dWidth, this.imageData.dHeight);
-    //     }
-    //     this.ctx.restore();
-    // }
     getMousePostion(e: MouseEvent | WheelEvent) {
         const rect = this.StaticCanvas.getBoundingClientRect();
         return {
@@ -951,7 +1014,6 @@ export class CanvasDraw {
             }
         }
     }
-    //new applyFilter
     applyFilter(colorFilter: FineTuneTypes){
         if (this.SelectedImage.px === null || this.SelectedImage.py === null || this.SelectedImage.index === null) {
             return;
@@ -960,31 +1022,6 @@ export class CanvasDraw {
         this.clear();
         this.drawCanvas();
     }
-    // getdataUrl() {
-    //     if (!this.imageData.image) {
-    //         return;
-    //     }
-    //     const DataUrl = this.getSectionDataURL(this.imageData.dx, this.imageData.dy, this.imageData.dWidth * this.scale, this.imageData.dHeight * this.scale);
-    //     return DataUrl;
-    // }
-    // getDataUrl2(type: string) {
-    //     let tempCanvas = document.createElement(`canvas`);
-    //     if (!this.imageData.image) {
-    //         return;
-    //     }
-    //     tempCanvas.width = this.imageData.image.width;
-    //     tempCanvas.height = this.imageData.image.height;
-    //     const tempCtx = tempCanvas.getContext(`2d`);
-    //     if (!tempCtx || !this.ctx) {
-    //         return;
-    //     }
-    //     tempCtx.filter = this.ctx.filter;
-    //     tempCtx.drawImage(this.imageData.image, 0, 0);
-    //     if (this.filter) {
-    //         this.applyTintColorOnCanvas(tempCanvas, this.filter);
-    //     }
-    //     return tempCanvas.toDataURL(`image/${type}`);
-    // };
     getDataUrl(){
         return this.StaticCanvas.toDataURL();
     }
@@ -1077,11 +1114,11 @@ export class CanvasDraw {
         if (!this.ctx || !this.imageEffectObj) {
             return;
         }
-        this.ctx.save();
-        this.ctx.translate(this.Origin.x, this.Origin.y);
-        this.ctx.scale(this.scale, this.scale);
-        // this.clear();
         this.setBackgroundColorHex(this.StaticCanvasColor);
+        this.ctx.save();
+        // this.ctx.translate(this.Origin.x, this.Origin.y);
+        // this.ctx.scale(this.scale, this.scale);
+        // this.ctx.translate(-this.Origin.x, -this.Origin.y);
         this.drawImage2();
         this.ctx.restore();
     }

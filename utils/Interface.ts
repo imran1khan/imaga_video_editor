@@ -22,18 +22,18 @@ export interface line extends shapeUnit {
     startPoint:point2,
     endPoint:point2,
 }
-export interface rectangle extends shapeUnit {
-    type:'ractangle'
-    startPoint:point,
-    width:number,
-    height:number,
-}
-export interface rectangle2 extends shapeUnit{
-    type:'rectangle2',
-    startPoint:point2,
-    endPoint:point2,
-    angle:number
-}
+// export interface rectangle extends shapeUnit {
+//     type:'ractangle'
+//     startPoint:point,
+//     width:number,
+//     height:number,
+// }
+// export interface rectangle2 extends shapeUnit{
+//     type:'rectangle2',
+//     startPoint:point2,
+//     endPoint:point2,
+//     angle:number
+// }
 export interface arc extends shapeUnit {
     type:`arc`
     startPoint:point,
@@ -55,6 +55,7 @@ export interface text {
     content:string;
     width:number,
     height:number,
+    textSize:number,
 }
 export type pointsArray = point2[];
-export type shape =  arc | arc2 | rectangle2 | line ;
+export type shape =  arc | arc2 | line ;
