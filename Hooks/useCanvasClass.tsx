@@ -126,6 +126,9 @@ export const useCanvasClass = (canvasId: string, interactiveCanvasId: string) =>
         if (squareAtom==='eraser') {
             canvasClassRef.current.curseStyle=curserStyle;
         }
+        else if(squareAtom==='pan') {
+            canvasClassRef.current.curseStyle='grab';
+        }
         else {
             canvasClassRef.current.curseStyle='default';
         }

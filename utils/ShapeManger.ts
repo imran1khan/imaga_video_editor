@@ -91,6 +91,19 @@ export class ShapeManager {
             }
         });
     }
+    panShapes(dx:number,dy:number){
+        this.shapesArray.forEach(shape => {
+            if (shape.type === 'arc') {
+                const arcShape = shape as arc2;
+                shape.startPoint.x!+=dx;
+                shape.startPoint.y!+=dy;
+            }
+            else if (shape.type==='line') {
+                const {startPoint,endPoint}=shape;
+                this.CanvasDraw.panPolygon([startPoint,endPoint],dx,dy);
+            }
+        });
+    }
     drawCustomShape(){
         if (!this.ctx) return;
         for (let i = 0; i < this.penShapes.length; i++) {
@@ -118,6 +131,12 @@ export class ShapeManager {
         for (let i = 0; i < this.penShapes.length; i++) {
             const p = this.penShapes[i];
             this.CanvasDraw.scaledPolygon(p,zoom,centerPoint);
+        }
+    }
+    panPenShapes(dx:number,dy:number){
+        for (let i = 0; i < this.penShapes.length; i++) {
+            const p = this.penShapes[i];
+            this.CanvasDraw.panPolygon(p,dx,dy);
         }
     }
     drawPolygonShapes(){
@@ -148,6 +167,12 @@ export class ShapeManager {
         for (let i = 0; i < this.polygonShapes.length; i++) {
             const polygon = this.polygonShapes[i];
             this.CanvasDraw.scaledPolygon(polygon,zoom,centerPoint);
+        }
+    }
+    panAllpolygon(dx:number,dy:number){
+        for (let i = 0; i < this.polygonShapes.length; i++) {
+            const polygon = this.polygonShapes[i];
+            this.CanvasDraw.panPolygon(polygon,dx,dy);
         }
     }
     isMouseOnPolygon(p: point2): number | null {
@@ -260,6 +285,12 @@ export class ShapeManager {
             this.textContent[i].width*=zoom;
             this.textContent[i].height*=zoom;
             this.textContent[i].startPoint=points[0];
+        }
+    }
+    panText(dx:number,dy:number){
+        for (let i = 0; i < this.textContent.length; i++) {
+            this.textContent[i].startPoint.x+=dx;
+            this.textContent[i].startPoint.y+=dy;
         }
     }
     isPointOntheText(p:point2){

@@ -24,7 +24,7 @@ interface ImagePosition {
     h:null|number
 }
 type Mode = 'none'|'drag'|'dragPolygon'|'dragCustomShape'|'drawTriangle'|'InteractiveRactangle'|'imageResize'|'rotate'|'resize';
-export type drawingMode = `none`|`ractangle`|`arc`|'line'|'pen'|'text'|'eraser';
+export type drawingMode = `none`|`ractangle`|`arc`|'line'|'pen'|'text'|'eraser'|'pan';
 type shapeType = 'text'|'shape'|'customeShape'|'image'|'polygon';
 interface imageEffectObject {
     px: number
@@ -83,6 +83,8 @@ export class CanvasDraw {
     public eraser:boolean=false;
     // current curserStyle
     public curseStyle:string='default';
+    // panning
+    public panning:boolean=false;
     constructor(canvas: HTMLCanvasElement,interactiveCanvas:HTMLCanvasElement, image?: HTMLImageElement) {
         this.StaticCanvas = canvas
         this.InteractiveCanvas=interactiveCanvas;
@@ -247,6 +249,11 @@ export class CanvasDraw {
             this.dragStartY = e.clientY-imagePos.py
             this.SelectedImage = imagePos;
         }
+        else if (this.drawMode==='pan') {
+            this.panning=true;
+            this.dragStartX=e.clientX;
+            this.dragStartY=e.clientY;
+        }
         else {
             this.mode = `InteractiveRactangle`;
             this.InterativeRectangle={x:e.clientX,y:e.clientY}
@@ -400,6 +407,7 @@ export class CanvasDraw {
             ];
             this.ShapeManger?.drawIrregularPolygons(points);
             this.customeShape=points;
+            this.curseStyle='grabbing'
         }
         if (this.drawMode==='arc' && this.startDrawing) {
             if (!this.startPoint.x || !this.startPoint.y) {
@@ -434,6 +442,25 @@ export class CanvasDraw {
         if (this.drawMode==='pen' && this.startDrawing && this.customeShape) {
             this.customeShape=[...this.customeShape,{x:e.clientX,y:e.clientY}];
             this.ShapeManger?.drawPenShape(this.customeShape);
+        }
+        if (this.drawMode==='pan' && this.panning) {
+            const dx = e.clientX-this.dragStartX;
+            const dy = e.clientY-this.dragStartY;
+            this.panImages(dx,dy);
+            this.ShapeManger?.panAllpolygon(dx,dy);
+            this.ShapeManger?.panText(dx,dy);
+            this.ShapeManger?.panPenShapes(dx,dy);
+            this.ShapeManger?.panShapes(dx,dy);
+            
+            this.drawCanvas();
+            this.ShapeManger?.drawShapes();
+            this.ShapeManger?.drawPolygonShapes();
+            this.ShapeManger?.drawCustomShape();
+            this.ShapeManger?.drawAlltextContent();
+
+            this.dragStartX=e.clientX;
+            this.dragStartY=e.clientY;
+            this.curseStyle='grabbing'
         }
         const check = this.checkForFrameCorner(e);
         if (check===null) {
@@ -491,6 +518,12 @@ export class CanvasDraw {
             this.ShapeManger?.penShapes.push(this.customeShape);
             this.customeShape=null;
         }
+        if (this.drawMode==='pan') {
+            this.dragStartX=0;
+            this.dragStartY=0;
+            this.curseStyle='grab'
+        }
+        this.panning=false;
         this.startDrawing = false;
         this.eraser=false;
     }
@@ -555,6 +588,18 @@ export class CanvasDraw {
             image.py=s.y;
             image.height=e.y-s.y;
             image.width=e.x-s.x
+        });
+    }
+    panImages(dx:number,dy:number){
+        this.imageEffectObj.forEach(image=>{
+            image.px+=dx;
+            image.py+=dy;
+        });
+    }
+    panPolygon(shape:pointsArray,dx:number,dy:number){
+        shape.forEach(point => {
+            point.x+=dx;
+            point.y+=dy;
         });
     }
     scaledPolygon(shape:pointsArray,zoom:number,centerPoint:point2={x:0,y:0}){

@@ -30,7 +30,7 @@ function Header2() {
                 <div className='flex items-center space-x-4 px-4 h-full'>
                     <div className='hover:cursor-pointer'><Lock size={15} strokeWidth={1.5} /></div>
                     <div className='dark:bg-slate-400 bg-slate-600 w-[0.08rem] h-[1rem]'></div>
-                    <div className='hover:cursor-pointer'><Hand size={15} strokeWidth={1.5} /></div>
+                    <div onClick={()=>{onClick('pan')}} className={`hover:cursor-pointer h-full px-3 rounded-md flex items-center ${squareAtom==='pan'?`dark:bg-purple-500 bg-green-600`:``}`}><Hand size={15} strokeWidth={1.5} /></div>
                     <div className='hover:cursor-pointer'><MousePointer size={15} strokeWidth={1.5} /></div>
                     <div onClick={()=>{onClick('pen')}} className={`hover:cursor-pointer h-full px-3 rounded-md flex items-center ${squareAtom==='pen'?`dark:bg-purple-500 bg-green-600`:``}`}><Pen size={15} strokeWidth={1.5} /></div>
                     <div onClick={()=>{onClick('ractangle')}} className={`hover:cursor-pointer h-full px-3 rounded-md flex items-center ${squareAtom==='ractangle'?`dark:bg-purple-500 bg-green-600`:``}`}><Square size={15} strokeWidth={1.5} /></div>
