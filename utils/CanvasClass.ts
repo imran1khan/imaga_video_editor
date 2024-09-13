@@ -5,17 +5,34 @@ import { arc, arc2, pointsArray, point, point2, RGBA, shape, text } from "./Inte
 import { ShapeManager } from "./ShapeManger";
 
 
-interface ImageValue {
-    image: HTMLImageElement | null;
-    sx: number;
-    sy: number;
-    sWidth: number;
-    sHeight: number;
-    dx: number;
-    dy: number;
-    dWidth: number;
-    dHeight: number;
-}
+/*
+right now i am facing an issue to rotate the image
+we cannot the the cordinate of the image and rotate it just like we used to do with the polygon and outher coutome shape
+so the only way we can rotate an image to use ctx.rotate but if we use this method then we are not going to be able to draw the frame 
+and drag the image to the current position and we cannot click and display the frame
+
+so one way to slove this is to make an array_of_frames which is going to contain all the frame of each image and we are going to drag the image with the help of the frame
+and when someone is going to click insted of check in which image the mouse has been clicked we are going to chack for the frame where it have been clicked
+and when the user want to drag the image , we are going to drag the frame and the image as well
+
+and when we want to rotate the image we going to use ctx.rotate and rotate the image and going to store the angle
+and at the same time we are going to rotate the  frame points of that respective image so when we want to click and show the frame we can so this easily
+
+now one way to rotate the frame is to use ctx.rotate and another one is polygon method
+but one more issue is where should i store the angle of the image/frame should i store that in my frame array or in image array
+
+i also need to make some functionality
+1. custome shape and store them
+2. selection multiple shapes or images 
+3. free-hand pen like drawing
+4. grid 
+5. pixelation and blur effect on the image
+6. resize of every type of shape --> V.V.I
+7. rotation of images --> V.V.I
+8. selection of the right image
+9. clipping of the images
+
+*/
 interface ImagePosition {
     px: null | number,
     py: null | number,
@@ -106,7 +123,6 @@ export class CanvasDraw {
         // this.animate();
     };
     animate(){
-        console.log('running')
         this.drawCanvas();
         this.ShapeManger?.drawCustomShape();
         this.ShapeManger?.drawPolygonShapes();
@@ -179,7 +195,7 @@ export class CanvasDraw {
             const {maxPoints,minPoints} = this.getMaxMin_points(polygonShape);
             this.clearInteractive();
             this.drawFrame(minPoints.x,minPoints.y,maxPoints.x-minPoints.x,maxPoints.y-minPoints.y);
-            this.selectedPolygon={polygon:polygonShape,index:polygonIndex};
+            // this.selectedPolygon={polygon:polygonShape,index:polygonIndex};
             this.selectedShape2={element:'polygon',index:polygonIndex};
         }
         else if (this.drawMode==='text') {
@@ -235,13 +251,23 @@ export class CanvasDraw {
             this.mode='imageResize';
             this.corner=check
         }
-        else if (check===4 && this.selectedPolygon) {
+        else if (check===4 && this.selectedShape2) {
             this.mode='rotate';
-            const {polygon,index}=this.selectedPolygon;
-            const {maxPoints,minPoints}=this.getMaxMin_points(polygon);
-            const centerPoint = {x:minPoints.x+(maxPoints.x-minPoints.x)/2,y:minPoints.y+(maxPoints.y-minPoints.y)/2};
-            const angle = Math.atan2(e.clientY-centerPoint.y,e.clientX-centerPoint.x);
-            this.startAngle={angle:angle,center:centerPoint}
+            const { element,index } = this.selectedShape2;
+            if (element==='customeShape') {                
+                const customeShape = this.ShapeManger!.penShapes[index];
+                const {maxPoints,minPoints}=this.getMaxMin_points(customeShape);
+                const centerPoint = {x:minPoints.x+(maxPoints.x-minPoints.x)/2,y:minPoints.y+(maxPoints.y-minPoints.y)/2};
+                const angle = Math.atan2(e.clientY-centerPoint.y,e.clientX-centerPoint.x);
+                this.startAngle={angle:angle,center:centerPoint};
+            }
+            else if (element==='polygon') {
+                const polygon = this.ShapeManger!.polygonShapes[index]
+                const {maxPoints,minPoints}=this.getMaxMin_points(polygon);
+                const centerPoint = {x:minPoints.x+(maxPoints.x-minPoints.x)/2,y:minPoints.y+(maxPoints.y-minPoints.y)/2};
+                const angle = Math.atan2(e.clientY-centerPoint.y,e.clientX-centerPoint.x);
+                this.startAngle={angle:angle,center:centerPoint}
+            }
         }
         else if (imagePos.index!==null && imagePos.px!==null && imagePos.py!==null) {
             this.mode='drag';
@@ -305,15 +331,28 @@ export class CanvasDraw {
             this.drawRectangle(this.InterativeRectangle.x,this.InterativeRectangle.y,e.clientX-this.InterativeRectangle.x,e.clientY-this.InterativeRectangle.y);
         }
         if (this.mode==='rotate') {
-            const {center,angle}=this.startAngle!;
-            const currentAngle = Math.atan2(e.clientY-center.y,e.clientX-center.x);
-            const New_Angle = currentAngle-angle;
-            const {polygon,index}=this.selectedPolygon!;
+            const {element,index}=this.selectedShape2!
+            if (element==='polygon') {                
+                const {center,angle}=this.startAngle!;
+                const currentAngle = Math.atan2(e.clientY-center.y,e.clientX-center.x);
+                const New_Angle = currentAngle-angle;
+                const polygon = this.ShapeManger!.polygonShapes[index];
+                this.ShapeManger!.rotateIrregularPolygons(polygon,New_Angle,{centerPoint:center});
+                this.startAngle!.angle=currentAngle;
+            }
+            else if (element==='customeShape') {
+                const {center,angle}=this.startAngle!;
+                const currentAngle = Math.atan2(e.clientY-center.y,e.clientX-center.x);
+                const New_Angle = currentAngle-angle;
+                const customeShape = this.ShapeManger!.penShapes[index]
+                this.ShapeManger!.rotateIrregularPolygons(customeShape,New_Angle,{centerPoint:center});
+                this.startAngle!.angle=currentAngle;
+            }
             this.drawCanvas();
-            this.ShapeManger!.rotateIrregularPolygons(polygon,New_Angle,{centerPoint:center});
-            this.ShapeManger!.drawIrregularPolygons(polygon);
-            this.customeShape=polygon;
-            this.startAngle!.angle=currentAngle;
+            this.ShapeManger?.drawCustomShape();
+            this.ShapeManger?.drawPolygonShapes();
+            this.ShapeManger?.drawShapes();
+            this.ShapeManger?.drawAlltextContent();
         }
         if (this.mode === `drag`|| this.mode==='dragCustomShape' || this.mode==='dragPolygon') {
             this.drawCanvas();
@@ -495,23 +534,11 @@ export class CanvasDraw {
             this.startPoint={x:null,y:null};
         }
         if (this.startDrawing && this.currentShape) {
-            // if (this.currentShape.type === 'line') {
-            //     const {startPoint,endPoint}=this.currentShape;
-            //     const {minPoints,maxPoints}=this.getMaxMin_points([startPoint,endPoint]);
-            //     this.currentShape.startPoint=minPoints;
-            //     this.currentShape.endPoint=maxPoints;
-            // }
             this.ShapeManger?.shapesArray.push(this.currentShape);
             this.startPoint={x:null,y:null};
             this.currentShape=null;
         }
-        if (this.mode==='rotate' && this.selectedPolygon) {
-            // const {index,shape}=this.selectedShape;
-            // if (this.currentShape?.type==='rectangle2' && shape.type==='rectangle2') {
-            //     this.ShapeManger!.shapesArray[index]={...shape,angle:this.currentShape.angle}
-            // }
-            const {polygon,index}=this.selectedPolygon;
-            this.ShapeManger!.polygonShapes[index]=polygon;
+        if (this.mode==='rotate') {
             this.mode='none';
         }
         if (this.drawMode==='pen' && this.customeShape) {
@@ -974,7 +1001,6 @@ export class CanvasDraw {
             const minY=Math.min(this.imageEffectObj[i].py + this.imageEffectObj[i].height,this.imageEffectObj[i].py);
             if (x<=maxX && x>=minX && y<=maxY && y>=minY) {
                 ImagePosition = { px: this.imageEffectObj[i].px, py: this.imageEffectObj[i].py, index: i,w:this.imageEffectObj[i].width,h:this.imageEffectObj[i].height }
-                break;
             }
         }
         return ImagePosition;
@@ -1097,23 +1123,11 @@ export class CanvasDraw {
         return tempCanvas.toDataURL();
     }
     getStaticCanvasImageData(x:number,y:number,w:number,h:number){
-        if (!this.isPointsWithinCanvas(x,y)) {
-            return;
-        }
         if (!this.ctx) {
             return;
         }
         const value = this.ctx.getImageData(x,y,w,h);
         return value;
-    }
-    isPointsWithinCanvas(x:number,y:number){
-        if (
-            x<=this.StaticCanvas.width && x>=0
-            && y<=this.StaticCanvas.height && y>=0
-        ) {
-            return true;
-        }
-        return false
     }
     applyTintColorOnCanvas(canvas: HTMLCanvasElement, colorFilter: FineTuneTypes) {
         const tempCtx = canvas.getContext(`2d`);
