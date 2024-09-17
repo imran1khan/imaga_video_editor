@@ -1,5 +1,5 @@
 import { CanvasDraw } from "./CanvasClass";
-import { arc, arc2, line, pointsArray, point2, shape, text } from "./Interface";
+import { arc, arc2, line, pointsArray, point2, shape, text, ellipse } from "./Interface";
 // import { arc, arc2, line, pointsArray, point2, rectangle, rectangle2, shape, text } from "./Interface";
 
 export class ShapeManager {
@@ -72,6 +72,9 @@ export class ShapeManager {
             if (shape.type==='line') {
                 const {startPoint,endPoint}=shape;
                 this.drawLine(startPoint,endPoint);
+            }
+            if (shape.type==='ellipse') {
+                this.drawEllipse(shape);
             }
         });
     }
@@ -301,6 +304,18 @@ export class ShapeManager {
             }
         }
         return null;
+    }
+    drawEllipse(ellipse:ellipse){
+        if (!this.ctx) {
+            return;
+        }
+        const {startPoint,radiusX,radiusY,anticlockwise,startAngle,endAngle,rotation}=ellipse;
+        this.ctx.save();
+        this.ctx.beginPath();
+        this.ctx.ellipse(startPoint.x,startPoint.y,radiusX,radiusY,rotation,startAngle,endAngle,anticlockwise);
+        this.ctx.stroke();
+        this.ctx.fill();
+        this.ctx.restore();
     }
     drawArc(arc: arc2,obj:{
         fillStyle?: string,

@@ -1,38 +1,10 @@
 import { hexToRgb, RandomInt } from "@/lib/utils";
 import { FineTuneTypes } from "@/packages/store/atoms/FinetuneAtom";
 import { ImageEffect } from "./ImageEffect";
-import { arc, arc2, pointsArray, point, point2, RGBA, shape, text } from "./Interface";
+import { arc, arc2, pointsArray, point, point2, RGBA, shape, text, ellipse } from "./Interface";
 import { ShapeManager } from "./ShapeManger";
 
 
-/*
-right now i am facing an issue to rotate the image
-we cannot the the cordinate of the image and rotate it just like we used to do with the polygon and outher coutome shape
-so the only way we can rotate an image to use ctx.rotate but if we use this method then we are not going to be able to draw the frame 
-and drag the image to the current position and we cannot click and display the frame
-
-so one way to slove this is to make an array_of_frames which is going to contain all the frame of each image and we are going to drag the image with the help of the frame
-and when someone is going to click insted of check in which image the mouse has been clicked we are going to chack for the frame where it have been clicked
-and when the user want to drag the image , we are going to drag the frame and the image as well
-
-and when we want to rotate the image we going to use ctx.rotate and rotate the image and going to store the angle
-and at the same time we are going to rotate the  frame points of that respective image so when we want to click and show the frame we can so this easily
-
-now one way to rotate the frame is to use ctx.rotate and another one is polygon method
-but one more issue is where should i store the angle of the image/frame should i store that in my frame array or in image array
-
-i also need to make some functionality
-1. custome shape and store them
-2. selection multiple shapes or images 
-3. free-hand pen like drawing
-4. grid 
-5. pixelation and blur effect on the image
-6. resize of every type of shape --> V.V.I
-7. rotation of images --> V.V.I
-8. selection of the right image
-9. clipping of the images
-
-*/
 interface ImagePosition {
     px: null | number,
     py: null | number,
@@ -40,14 +12,22 @@ interface ImagePosition {
     w:null|number,
     h:null|number
 }
+interface Frame {
+    x:number,
+    y:number,
+    w:number,
+    h:number,
+    angle:number
+}
 type Mode = 'none'|'drag'|'dragPolygon'|'dragCustomShape'|'drawTriangle'|'InteractiveRactangle'|'imageResize'|'rotate'|'resize';
-export type drawingMode = `none`|`ractangle`|`arc`|'line'|'pen'|'text'|'eraser'|'pan';
+export type drawingMode = `none`|`ractangle`|`arc`|'line'|'pen'|'text'|'eraser'|'pan'|'ellipse';
 type shapeType = 'text'|'shape'|'customeShape'|'image'|'polygon';
 interface imageEffectObject {
     px: number
     py: number
     width: number,
-    height: number
+    height: number,
+    angle:number,
     imageEffectObj: ImageEffect
 }
 export const curserStyle = 'url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAAAAXNSR0IArs4c6QAAAOBJREFUOE9jZKAyYKSyeQzDwMD////7MDAw6EGD5hIjI+MWfMGE08sggz59+jTr5s2bnPv27eMFGeLk5PRZXV39Ox8fXxoug7EaCDLs58+fa0NDQ9k2b96M4iBfX1+G1atX/2JnZw/GZihWAz9+/PgsJiZGEt0wmMkgQ5csWfKcn59fCt37GAaCXHf69OnFZmZmAvjC6tSpUx9MTU1j0V2JzcCqzs7OpoqKCmZ8BnZ0dPwtLy+vY2RkbENWRxcDqetlkPOpGikgA6mebGCGUi1hI8ca1bIeucXaMCi+SPU6AHSTjhWHMn6TAAAAAElFTkSuQmCC") 10 10, auto';
@@ -102,6 +82,8 @@ export class CanvasDraw {
     public curseStyle:string='default';
     // panning
     public panning:boolean=false;
+    // image_frameARR --> first start with the image frame then outhers
+    // image_FrameArr:Frame[]=[];
     constructor(canvas: HTMLCanvasElement,interactiveCanvas:HTMLCanvasElement, image?: HTMLImageElement) {
         this.StaticCanvas = canvas
         this.InteractiveCanvas=interactiveCanvas;
@@ -175,10 +157,11 @@ export class CanvasDraw {
             this.selectedShape2={element:'text',index:index};
         }
         if (imagePos.index!==null && imagePos.px!==null && imagePos.py!==null) {
-            // const image = this.imageEffectObj[imagePos.index];
             const {AdjustedImageCordinate}=this.getAllCordinate(imagePos.index);
             this.clearInteractive();
             if (this.showFrame) {
+                // const frame = this.image_FrameArr[imagePos.index];
+                // this.drawFrame(frame.x,frame.y,frame.w,frame.h,{angle:frame.angle});
                 this.drawFrame(AdjustedImageCordinate.topLeft.x,AdjustedImageCordinate.topLeft.y,AdjustedImageCordinate.bottomRight.x-AdjustedImageCordinate.topLeft.x,AdjustedImageCordinate.bottomRight.y-AdjustedImageCordinate.topLeft.y);
             }
             this.selectedShape2={element:'image',index:imagePos.index};
@@ -268,6 +251,12 @@ export class CanvasDraw {
                 const angle = Math.atan2(e.clientY-centerPoint.y,e.clientX-centerPoint.x);
                 this.startAngle={angle:angle,center:centerPoint}
             }
+            else if (element==='image') {
+                const image = this.imageEffectObj[index];
+                const centerPoint={x:image.px+image.width/2,y:image.py+image.height/2}
+                const angle = Math.atan2(e.clientY-centerPoint.y,e.clientX-centerPoint.x);
+                this.startAngle={angle:angle,center:centerPoint}
+            }
         }
         else if (imagePos.index!==null && imagePos.px!==null && imagePos.py!==null) {
             this.mode='drag';
@@ -299,6 +288,10 @@ export class CanvasDraw {
         if (this.drawMode === 'pen') {
             this.customeShape=[{x:e.clientX,y:e.clientY}];
             this.startDrawing=true;
+        }
+        if (this.drawMode==='ellipse') {
+            this.startDrawing=true;
+            this.startPoint = {x:e.clientX,y:e.clientY};
         }
         if (this.drawMode==='eraser') {
             this.eraser=true;
@@ -348,6 +341,16 @@ export class CanvasDraw {
                 this.ShapeManger!.rotateIrregularPolygons(customeShape,New_Angle,{centerPoint:center});
                 this.startAngle!.angle=currentAngle;
             }
+            else if (element==='image') {
+                const {center,angle}=this.startAngle!;
+                const currentAngle = Math.atan2(e.clientY-center.y,e.clientX-center.x);
+                const New_Angle = currentAngle-angle;
+                this.imageEffectObj[0].angle=New_Angle;
+                // const frame = this.image_FrameArr[index];
+                // frame.angle=New_Angle;
+                // this.clearInteractive();
+                // this.drawFrame(frame.x,frame.y,frame.w,frame.h,{angle:New_Angle});
+            }
             this.drawCanvas();
             this.ShapeManger?.drawCustomShape();
             this.ShapeManger?.drawPolygonShapes();
@@ -355,7 +358,7 @@ export class CanvasDraw {
             this.ShapeManger?.drawAlltextContent();
         }
         if (this.mode === `drag`|| this.mode==='dragCustomShape' || this.mode==='dragPolygon') {
-            this.drawCanvas();
+            
             if (this.mode==='drag' && this.MoveShape) {
                 this.dragMoveShape(e);
             }
@@ -393,6 +396,7 @@ export class CanvasDraw {
             else {
                 this.dragMoveImage2(e);
             }
+            this.drawCanvas();
             this.ShapeManger?.drawPolygonShapes();
             this.ShapeManger?.drawCustomShape();
             this.ShapeManger?.drawShapes();
@@ -446,7 +450,6 @@ export class CanvasDraw {
             ];
             this.ShapeManger?.drawIrregularPolygons(points);
             this.customeShape=points;
-            this.curseStyle='grabbing'
         }
         if (this.drawMode==='arc' && this.startDrawing) {
             if (!this.startPoint.x || !this.startPoint.y) {
@@ -459,9 +462,30 @@ export class CanvasDraw {
             this.ShapeManger?.drawPolygonShapes();
             this.ShapeManger?.drawCustomShape();
             this.ShapeManger?.drawAlltextContent();
-
             this.ShapeManger?.drawLine({x:this.startPoint.x,y:this.startPoint.y},{x:e.clientX,y:e.clientY},{setLineDesh:[5,3]});
             this.ShapeManger?.drawArc(this.currentShape);
+        }
+        if (this.drawMode==='ellipse' && this.startDrawing) {
+            const {x,y}=this.startPoint!
+            const ellipes = {
+                type:'ellipse',
+                startPoint:this.startPoint,
+                startAngle:0,
+                endAngle:2*Math.PI,
+                anticlockwise:false,
+                radiusX:e.clientX-x!<0?0:e.clientX-x!,
+                radiusY:e.clientY-y!<0?0:e.clientY-y!,
+                rotation:0
+            } as ellipse
+            this.currentShape=ellipes
+            
+            this.drawCanvas();
+            this.ShapeManger?.drawCustomShape();
+            this.ShapeManger?.drawPolygonShapes();
+            this.ShapeManger?.drawShapes();
+            this.ShapeManger?.drawAlltextContent();
+
+            this.ShapeManger?.drawEllipse(ellipes);
         }
         if (this.drawMode==='line' && this.startDrawing) {
             if (!this.startPoint.x || !this.startPoint.y) {
@@ -576,6 +600,7 @@ export class CanvasDraw {
                 }
             });
             this.drawCanvas();
+            this.ShapeManger?.drawPolygonShapes();
             this.ShapeManger?.drawCustomShape();
             this.ShapeManger?.drawShapes();
             this.ShapeManger?.drawAlltextContent();
@@ -723,7 +748,6 @@ export class CanvasDraw {
         if (this.SelectedImage.px === null || this.SelectedImage.py === null || this.SelectedImage.index === null) {
             return;
         }
-        const mousePos = this.getMousePostion(e);
         this.imageEffectObj[this.SelectedImage.index].px=e.clientX-this.dragStartX;
         this.imageEffectObj[this.SelectedImage.index].py=e.clientY-this.dragStartY;
         const image = this.imageEffectObj[this.SelectedImage.index];
@@ -734,6 +758,7 @@ export class CanvasDraw {
         // this.setBackgroundColorHex(this.StaticCanvasColor);
         this.clearInteractive();
         this.drawCanvas();
+        // this.image_FrameArr[this.SelectedImage.index]={...this.image_FrameArr[this.SelectedImage.index],x:image.px,y:image.py}
         this.drawFrame(AdjustedImageCordinate.topLeft.x,AdjustedImageCordinate.topLeft.y,AdjustedImageCordinate.bottomRight.x-AdjustedImageCordinate.topLeft.x,AdjustedImageCordinate.bottomRight.y-AdjustedImageCordinate.topLeft.y);
     }
     dragMoveShape(e:MouseEvent){
@@ -767,6 +792,9 @@ export class CanvasDraw {
             endPoint.x+=deltaX;
             endPoint.y+=deltaY;
             this.ShapeManger!.shapesArray[index]={...shape,startPoint:{x:newX,y:newY},endPoint};
+        }
+        else if (shape.type==='ellipse') {
+            console.log(shape)
         }
     }
     drawCircle(x:number,y:number,radius:number){
@@ -847,7 +875,6 @@ export class CanvasDraw {
         ctx.roundRect(x, y, w, h, validatedRadii);
         ctx.fill();
         ctx.stroke();
-
     }
     drawLine(pointA:point,pointB:point){
         if (pointA.x===null||pointB.x===null||pointA.y===null||pointB.y===null) {
@@ -1166,20 +1193,27 @@ export class CanvasDraw {
         const width = ImageObj.canvas.width;
         const height = ImageObj.canvas.height;
         this.imageEffectObj.push({
-            px, py, width, height, imageEffectObj: ImageObj
+            px, py, width, height, imageEffectObj: ImageObj,angle:0
         });
+        // this.image_FrameArr.push({
+        //     x:px,
+        //     y:py,
+        //     w:width,
+        //     h:height,
+        //     angle:0
+        // });
     }
     drawCanvas() {
         if (!this.ctx || !this.imageEffectObj) {
             return;
         }
         this.setBackgroundColorHex(this.StaticCanvasColor);
-        this.ctx.save();
+        // this.ctx.save();
         // this.ctx.translate(this.Origin.x, this.Origin.y);
         // this.ctx.scale(this.scale, this.scale);
         // this.ctx.translate(-this.Origin.x, -this.Origin.y);
         this.drawImage2();
-        this.ctx.restore();
+        // this.ctx.restore();
     }
     drawImage2() {
         if (!this.ctx || this.imageEffectObj.length===0) {
@@ -1187,7 +1221,15 @@ export class CanvasDraw {
         }
         for (let i = 0; i < this.imageEffectObj.length; i++) {
             const canvas = this.imageEffectObj[i].imageEffectObj.canvas;
+            const image = this.imageEffectObj[i];
+            const centerpoint = {x:image.px+image.width/2,y:image.py+image.height/2};
+
+            this.ctx.save();
+            this.ctx.translate(centerpoint.x, centerpoint.y);
+            this.ctx.rotate(image.angle);
+            this.ctx.translate(-centerpoint.x, -centerpoint.y);
             this.ctx.drawImage(canvas, this.imageEffectObj[i].px, this.imageEffectObj[i].py,this.imageEffectObj[i].width,this.imageEffectObj[i].height);
+            this.ctx.restore();
         }
     }
     adjustCanvas() {
